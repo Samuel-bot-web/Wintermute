@@ -16,6 +16,11 @@
         description: Docker-Verwaltung
         icon: portainer.png
 
+    - Watchtower:
+        href: http://192.168.178.36:8080
+        description: Docker-Update-Service
+        icon: watchtower.png
+
 - Smart Home:
     - Home Assistant:
         href: http://192.168.178.36:8123
