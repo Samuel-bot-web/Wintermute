@@ -1,0 +1,19 @@
+# Laufzeitdaten
+**/config/
+**/cache/
+**/data/
+**/work/
+
+# Datenbanken
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Docker Volumes
+volumes/
+
+# Environment
+.env
