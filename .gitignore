@@ -1,5 +1,10 @@
 # Laufzeitdaten
 **/config/
+!stacks/homepage/config/
+!stacks/homepage/config/*.yaml
+!stacks/homepage/config/*.css
+!stacks/homepage/config/*.js
+stacks/homepage/config/logs/
 **/cache/
 **/data/
 **/work/
