@@ -1,0 +1,28 @@
+---
+# For configuration options and examples, please see:
+# https://gethomepage.dev/configs/info-widgets/
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+
+- glances:
+    url: http://192.168.178.36:61208
+    version: 4
+    metric: network:enp5s0
+
+- glances:
+    url: http://192.168.178.36:61208
+    version: 4
+    metric: sensor:Package id 0
+
+- datetime:
+    locale: de
+    text_size: xl
+    format:
+      dateStyle: long
+      timeStyle: short
+
+- search:
+    provider: duckduckgo
