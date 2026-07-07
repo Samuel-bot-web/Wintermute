@@ -4,6 +4,9 @@ services:
     container_name: watchtower
     restart: unless-stopped
 
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
     ports:
       - "8080:8080"
 
@@ -16,5 +19,6 @@ services:
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_ROLLING_RESTART: "true"
       WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_HTTP_API_UPDATE: "true"
       WATCHTOWER_HTTP_API_TOKEN: "3Gv9!f2Q#Lm8RzX7@Pq1Kj5Nb0YsWd"

@@ -4,6 +4,9 @@ services:
     container_name: homepage
     restart: unless-stopped
 
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
     ports:
       - "3001:3000"
 

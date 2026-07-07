@@ -6,6 +6,9 @@ services:
     pid: host
     network_mode: host
 
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
     environment:
       - GLANCES_OPT=-w
 
