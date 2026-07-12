@@ -230,3 +230,39 @@ Docker-Dienste laufen nicht direkt auf dem Proxmox-Host.
 ### Zugriff / Referenzen (Ergänzung)
 - Mountpoint 6-TB auf Host: /mnt/nas6tb
 - Mountpoint 6-TB in VM100: /mnt/nas6tb (identisch, wie bei /mnt/media)
+
+## Aktueller Stand (13.07.2026, Ende Session)
+
+### Vollständig abgeschlossen
+- Samba-Freigabe eingerichtet (stacks/samba/, dperson/samba-Image):
+  - Freigaben: media (-> /mnt/media, 4-TB) und nas6tb (-> /mnt/nas6tb, 6-TB)
+  - Zugriff nur mit Benutzername/Passwort (kein Gastzugriff), Nutzer
+    "samuel", Passwort in stacks/samba/.env (nicht im Git-Repo, siehe
+    .gitignore)
+  - Getestet von Windows: beide Freigaben (\\192.168.178.36\media,
+    \\192.168.178.36\nas6tb) erfolgreich verbunden
+  - Läuft unabhängig von Jellyfin, kein Konflikt festgestellt
+
+### Bekannte offene Probleme (bewusst zurückgestellt)
+- QEMU Guest Agent läuft nicht in VM100, sauberer Soft-Reboot via
+  Proxmox aktuell nicht möglich (siehe Eintrag 13.07. während Session).
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401,
+  Upstream-Bug (GitHub Discussion #5074), Workaround aktiv.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (nur noch ~69 GB frei).
+- Samba: UID/Permission-Mapping zwischen Container und Host noch nicht
+  im Detail geprüft - falls künftig Dateien, die per Samba angelegt
+  werden, von anderen Diensten (z.B. Jellyfin) nicht lesbar sind, dort
+  ansetzen.
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Einrichtung Paperless und/oder Nextcloud auf der 6-TB-Platte
+   (ursprünglich vorgesehener Zweck laut Planung)
+2. QEMU Guest Agent in VM100 installieren für sauberen Soft-Reboot
+3. Home-Assistant-API-Token widerrufen und neu setzen (nur in .env,
+   nicht im Chat teilen)
+4. Bei Gelegenheit: 4-TB-Platte Speicherplatz prüfen/aufräumen
+
+### Zugriff / Referenzen (Ergänzung)
+- Samba: \\192.168.178.36\media, \\192.168.178.36\nas6tb
+  (Benutzer samuel, Passwort siehe stacks/samba/.env auf VM100)
