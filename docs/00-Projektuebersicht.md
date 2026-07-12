@@ -184,3 +184,49 @@ Docker-Dienste laufen nicht direkt auf dem Proxmox-Host.
 - AdGuard: http://192.168.178.36:3000 (Weboberfläche), Port 80 (Admin
   laut Assistent)
 - Portainer: https://192.168.178.36:9443
+
+## Aktueller Stand (13.07.2026, während Session)
+
+### Vollständig abgeschlossen
+- 6-TB-Platte (Serial WPR0CY3K, /dev/disk/by-id/ata-ST6000VX009-2ZR186_WPR0CY3K):
+  altes Staging-ext4 entfernt, neu mit LUKS2 verschlüsselt, Keyfile-
+  Kopplung an denselben Keyfile wie media4tb (/etc/cryptsetup-keys.d/
+  media-4tb.key), ein Dropbear-Unlock genügt weiterhin für alle Platten
+  - crypttab: media6tb_crypt UUID=f48b2e41-0020-4917-b3da-4d9056dfa548
+  - Dateisystem: ext4, Label media6tb, UUID a59ab78a-d978-43e3-afd2-592d6d3aa7e6
+  - Mountpoint Host: /mnt/nas6tb
+  - Reboot-Test erfolgreich: Dropbear fragt weiterhin nur einmal für
+    beide Platten
+- Proxmox Directory-Mapping angelegt (/etc/pve/mapping/directory.cfg):
+  media6tb -> path=/mnt/nas6tb (analog media4tb -> /mnt/media)
+- Per virtiofs an VM100 angebunden: virtiofs1 dirid=media6tb,cache=always
+  in /etc/pve/qemu-server/100.conf
+- VM100 fstab: media6tb /mnt/nas6tb virtiofs defaults 0 0 (analog media4tb)
+  - Mount bestätigt in VM100: /mnt/nas6tb, 5,5 TB, 5,2 TB frei
+- onboot=1 für VM100 und VM101 gesetzt (fehlte bisher, VM100 war nach
+  Host-Reboot deshalb nicht automatisch gestartet - dabei entdeckt)
+
+### Bekannte offene Probleme (bewusst zurückgestellt)
+- QEMU Guest Agent läuft nicht in VM100 (sudo qm reboot 100 schlägt mit
+  Timeout fehl, Fallback war qm stop/start bzw. qm reboot --skipLock).
+  Bei Gelegenheit qemu-guest-agent in VM100 installieren für sauberen
+  Soft-Reboot via Proxmox.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401,
+  Upstream-Bug (GitHub Discussion #5074), Workaround aktiv.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (nur noch ~69 GB frei,
+  3,4 TB von 3,6 TB belegt) - im Blick behalten, bevor Nextcloud/
+  Paperless-Daten oder weitere Medien dazukommen.
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Samba-Freigabe einrichten (stacks/samba/, siehe Planungsnotiz in
+   50-Docker.md):
+   - Zugriff auf /mnt/media (4-TB) und /mnt/nas6tb (6-TB)
+   - Benutzername/Passwort-Absicherung, kein anonymer Zugriff
+   - Läuft unabhängig von Jellyfin, kein Konflikt
+2. Vorgesehener Zweck der 6-TB-Platte laut ursprünglicher Planung:
+   Paperless, Nextcloud - Einrichtung noch offen
+
+### Zugriff / Referenzen (Ergänzung)
+- Mountpoint 6-TB auf Host: /mnt/nas6tb
+- Mountpoint 6-TB in VM100: /mnt/nas6tb (identisch, wie bei /mnt/media)
