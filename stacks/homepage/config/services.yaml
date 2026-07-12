@@ -3,26 +3,22 @@
         href: http://192.168.178.36
         description: DNS & Werbeblocker
         icon: adguard-home.png
-
 - Medien:
     - Jellyfin:
         href: http://192.168.178.36:8096
         description: Filme & Serien
         icon: jellyfin.png
-
 - Verwaltung:
     - Portainer:
         href: https://192.168.178.36:9443
         description: Docker-Verwaltung
         icon: portainer.png
-
     - Watchtower:
         href: http://192.168.178.36:8080
         description: Docker-Update-Service
         icon: watchtower.png
-
 - Smart Home:
     - Home Assistant:
-        href: http://192.168.178.36:8123
+        href: http://192.168.178.38:8123
         description: Smart-Home-Zentrale
         icon: home-assistant.png
