@@ -70,3 +70,23 @@ vornherein frei lassen.
 - Als Proxmox-Storage "local-lvm" registriert (content: images,rootdir)
 - Verifiziert per `pvesm status`: Status active, 0% belegt bei Erstellung
 - Damit ist die Storage-Grundlage für VM100 und VM101 vorhanden
+
+## VM101: Home Assistant OS (12.07.2026)
+
+- Home Assistant OS 18.1 als VM101 eingerichtet
+- Installationsweg: offizielles qcow2-Image von GitHub (nicht ISO-basiert,
+  HAOS bietet kein ISO an), per `qm importdisk` in local-lvm importiert
+- Konfiguration: 2 Cores, 4096 MB RAM, 32G Disk (aus dem Image, discard=on),
+  OVMF/UEFI ohne Secure Boot (pre-enrolled-keys=0), q35, Guest Agent aktiviert
+- Netz: vmbr0, MAC BC:24:11:41:67:BA, feste IP 192.168.178.38
+  (Fritz!Box-Reservierung eingerichtet)
+- Web-UI: http://192.168.178.38:8123
+
+### Stolperfalle beim Einrichten
+
+`qm importdisk` hängt die importierte Disk zunächst nur als "unused0"
+in die VM-Konfiguration ein - sie muss danach manuell als scsi0
+gebunden UND die Boot-Reihenfolge manuell auf scsi0 gesetzt werden,
+sonst versucht die VM von net0 zu booten und schlägt fehl:
+qm set 101 --scsi0 local-lvm:vm-101-disk-1,discard=on
+qm set 101 --boot order=scsi0
