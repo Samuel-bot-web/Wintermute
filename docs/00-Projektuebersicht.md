@@ -266,3 +266,76 @@ Docker-Dienste laufen nicht direkt auf dem Proxmox-Host.
 ### Zugriff / Referenzen (Ergänzung)
 - Samba: \\192.168.178.36\media, \\192.168.178.36\nas6tb
   (Benutzer samuel, Passwort siehe stacks/samba/.env auf VM100)
+
+## Aktueller Stand (13.07.2026, während Session - Internet-Zugang vorbereitet)
+
+### Vollständig abgeschlossen
+- Domain brueggemann.site (Registrar: INWX) zu Cloudflare migriert:
+  Nameserver auf doug.ns.cloudflare.com / june.ns.cloudflare.com
+  umgestellt, DNS-Verwaltung läuft jetzt über Cloudflare (kostenloser
+  Plan), Registrierung bleibt weiterhin bei INWX
+- AdGuard-Webport-Konflikt behoben: interne Weboberfläche lief
+  unerwartet auf Port 80 (address: 0.0.0.0:80 in AdGuardHome.yaml),
+  kollidierte mit Nginx Proxy Manager. Auf Port 3000 umgestellt
+  (sowohl in AdGuardHome.yaml als auch im Docker-Portmapping), Port 80
+  im Compose-File entfernt. DNS-Funktion (Port 53) durchgehend
+  unterbrechungsfrei, nur die Web-UI betroffen.
+- Nginx Proxy Manager eingerichtet (stacks/npm/, Image
+  jc21/nginx-proxy-manager): läuft auf Port 81 (Admin-UI), 80/443
+  (Proxy-Traffic). Login-Zugangsdaten geändert (Standard-Login ersetzt).
+  Zweck: internes Routing von Subdomains zu den jeweiligen Docker-
+  Diensten, TLS-Terminierung übernimmt Cloudflare.
+- Cloudflare Tunnel eingerichtet (stacks/cloudflared/, Image
+  cloudflare/cloudflared): Tunnel-Name wintermute-vm100, Token in
+  stacks/cloudflared/.env (nicht im Git-Repo). Tunnel verbindet ohne
+  offene Ports an der Fritz!Box - kein Port-Forwarding nötig,
+  Datenverkehr läuft ausgehend von VM100 zu Cloudflare.
+  - 4 Verbindungen zu Cloudflare-Rechenzentren bestätigt (fra06, fra08,
+    fra17), alle Connectivity-Pre-Checks bestanden
+- End-to-End-Test erfolgreich: Testroute npm-test.brueggemann.site ->
+  192.168.178.36:81 über Mobilfunknetz erreichbar (danach wieder
+  entfernt, da NPM nicht dauerhaft öffentlich mit Standard-Zugriff
+  erreichbar sein soll)
+- Homepage aktualisiert (stacks/homepage/config/services.yaml):
+  - AdGuard-Link auf neuen Port 3000 korrigiert
+  - Samba-Freigabe ergänzt (Kategorie Netzwerk)
+  - Neue Kategorie "Infrastruktur" mit Nginx Proxy Manager ergänzt
+
+### Architektur für öffentlichen Zugriff (Entscheidung getroffen)
+Internet -> Cloudflare (TLS-Terminierung, DDoS-Schutz) -> Cloudflare
+Tunnel (cloudflared auf VM100, keine offenen Ports) -> Nginx Proxy
+Manager (Routing nach Hostname) -> jeweiliger Dienst
+
+Geplante Subdomains:
+- paperless.brueggemann.site -> Paperless-ngx
+- cloud.brueggemann.site -> Nextcloud
+- photos.brueggemann.site -> Immich
+
+Interne Dienste (Homepage, Jellyfin, Portainer, AdGuard, Home
+Assistant, Samba) bleiben bewusst NUR im lokalen Netz erreichbar,
+werden nicht über den Tunnel veröffentlicht.
+
+### Bekannte offene Probleme (bewusst zurückgestellt)
+- QEMU Guest Agent läuft nicht in VM100, sauberer Soft-Reboot via
+  Proxmox aktuell nicht möglich.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401,
+  Upstream-Bug (GitHub Discussion #5074), Workaround aktiv.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (nur noch ~69 GB frei).
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Paperless-ngx deployen (leichtgewichtigster der drei Dienste,
+   erster Praxistest für öffentlichen Zugriff über die neue
+   Infrastruktur)
+2. Public Hostname-Route in Cloudflare für paperless.brueggemann.site
+   anlegen, Proxy Host in NPM einrichten
+3. Nach erfolgreichem Test: Nextcloud, danach Immich (in dieser
+   Reihenfolge wegen steigendem Ressourcenbedarf)
+4. QEMU Guest Agent in VM100 installieren
+5. Home-Assistant-API-Token widerrufen und neu setzen
+
+### Zugriff / Referenzen (Ergänzung)
+- Nginx Proxy Manager: http://192.168.178.36:81
+- Cloudflare Zero Trust Dashboard: https://one.dash.cloudflare.com
+- AdGuard-Weboberfläche (korrigiert): http://192.168.178.36:3000
+- Domain: brueggemann.site (Registrar INWX, DNS via Cloudflare)
