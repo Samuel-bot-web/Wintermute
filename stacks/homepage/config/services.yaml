@@ -1,8 +1,12 @@
 - Netzwerk:
     - AdGuard:
-        href: http://192.168.178.36
+        href: http://192.168.178.36:3000
         description: DNS & Werbeblocker
         icon: adguard-home.png
+    - Samba:
+        href: \\192.168.178.36
+        description: Datei-Freigabe (media, nas6tb)
+        icon: samba.png
 - Medien:
     - Jellyfin:
         href: http://192.168.178.36:8096
@@ -17,6 +21,11 @@
         href: http://192.168.178.36:8080
         description: Docker-Update-Service
         icon: watchtower.png
+- Infrastruktur:
+    - Nginx Proxy Manager:
+        href: http://192.168.178.36:81
+        description: Reverse Proxy & SSL
+        icon: nginx-proxy-manager.png
 - Smart Home:
     - Home Assistant:
         href: http://192.168.178.38:8123
