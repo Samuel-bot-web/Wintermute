@@ -663,3 +663,51 @@ des zweiten Nutzers. Noch nicht final eingerichtet, nur Weg dokumentiert.
   - Paperless-ngx: lokal 8010, öffentlich paperless.brueggemann.site
   - Nextcloud: lokal 8020, öffentlich cloud.brueggemann.site
   - Immich: lokal 2283, öffentlich photos.brueggemann.site
+
+## Aktueller Stand (13.07.2026, während Session - Watchtower-Fix)
+
+### Vollständig abgeschlossen
+- Watchtower-Label ergänzt bei: Nginx Proxy Manager, Samba, Cloudflared
+  (com.centurylinklabs.watchtower.enable=true) - diese drei werden ab
+  sofort automatisch aktualisiert
+- Bewusst OHNE Label gelassen: Paperless-ngx, Nextcloud, Immich -
+  diese bleiben manuell aktualisiert, da Versionssprünge bei allen
+  dreien potenziell breaking Datenbank-Migrationen mit sich bringen
+  können und aktuell noch kein Backup-Konzept existiert
+- WICHTIGER BUGFIX gefunden und behoben: Watchtower-Container war
+  gestoppt (nicht mehr vorhanden trotz "restart: unless-stopped" in
+  der Config - vermutlich manuell gestoppt oder bei einem früheren
+  VM-Neustart nicht wiederhochgekommen). Zusätzlich lief die
+  Konfiguration in einem Modus, der den Zeitplan de facto deaktivierte:
+  WATCHTOWER_HTTP_API_UPDATE=true unterdrückt automatische
+  Zeitplan-Läufe, außer man setzt zusätzlich
+  WATCHTOWER_HTTP_API_PERIODIC_POLLS=true. Das bedeutet: seit der
+  Ersteinrichtung von Watchtower gab es hoechstwahrscheinlich NIE
+  automatische, zeitgesteuerte Updates - nur manuelle Ausloesung per
+  HTTP-API war moeglich.
+- Fix: WATCHTOWER_HTTP_API_PERIODIC_POLLS=true in
+  stacks/watchtower/compose.yml ergänzt. Bestätigt per Logs: "Scheduling
+  first run: 2026-07-14 04:00:00" - Zeitplan läuft jetzt wie ursprünglich
+  vorgesehen (taeglich 4 Uhr)
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Backup-Konzept fuer /mnt/nas6tb weiterhin nicht umgesetzt - solange
+  das nicht steht, bleiben Paperless/Nextcloud/Immich bewusst von
+  automatischen Updates ausgenommen
+- QEMU Guest Agent laeuft nicht in VM100
+- Home-Assistant-API-Token weiterhin ausstehend zu widerrufen/ersetzen
+- Externe Festplatte 2 (WD, 3,6TB) zeigt einen SMART
+  Current_Pending_Sector (1 Sektor) im Ordner
+  Bilder/2023/Urlaub bad Schandau/Ausgabe - Datei/Bereich beim Kopieren
+  vermutlich uebersprungen, ggf. spaeter erneuten Leseversuch
+  unternehmen oder als Verlust hinnehmen
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Backup-Konzept fuer /mnt/nas6tb definieren und umsetzen (weiterhin
+   hoechste Prioritaet)
+2. Nach Abschluss des Foto-Imports: Watchtower-Label-Strategie fuer
+   Paperless/Nextcloud/Immich neu bewerten, sobald Backups stehen
+3. QEMU Guest Agent installieren
+4. Home-Assistant-API-Token erneuern
+5. RAM-Aufruestung (2x 8GB DDR4-2400 UDIMM 2Rx8, bestellt/in Pruefung)
+   einbauen und Speicherzuweisung der VMs anpassen
