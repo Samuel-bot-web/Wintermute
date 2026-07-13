@@ -505,3 +505,161 @@ eine der beiden.
 ### Zugriff / Referenzen (Ergänzung)
 - Nextcloud (lokal): http://192.168.178.36:8020
 - Nextcloud (öffentlich): https://cloud.brueggemann.site
+
+## Aktueller Stand (13.07.2026, Ende Session - alle drei Cloud-Dienste live)
+
+### Vollständig abgeschlossen
+- VM100-Systemdisk von 32GB auf 64GB erweitert (Proxmox-Thin-Pool hatte
+  reichlich Reserve: 15,53% von 175,99GB belegt). Ablauf: qm resize
+  100 scsi0 +32G auf dem Host, danach growpart + resize2fs in der VM
+  (kein LVM in VM100, reines Partitionsschema). Grund: 96% Belegung
+  durch die vielen neuen Docker-Images (Paperless, Nextcloud, Immich
+  zusammen mehrere GB).
+- Immich eingerichtet (stacks/immich/, ghcr.io/immich-app/immich-server
+  + immich-machine-learning + valkey (redis-fork) + ghcr.io/immich-app/
+  postgres mit VectorChord/pgvector-Erweiterung fuer KI-Bildersuche):
+  - Daten auf 6-TB-Platte: /mnt/nas6tb/immich/{upload,pgdata,model-cache}
+  - Lokal erreichbar: http://192.168.178.36:2283
+  - DB_STORAGE_TYPE=HDD gesetzt (6-TB-Platte ist klassische Festplatte,
+    keine SSD - passt Postgres-IO-Einstellungen entsprechend an)
+  - Admin-Account bei Erstaufruf im Browser angelegt (nicht wie bei
+    Nextcloud/Paperless automatisch per .env)
+  - Bekannte harmlose Log-Meldung: "database "samuel" does not exist"
+    wiederholt sich in den Logs (interner Healthcheck verbindet ohne
+    explizite Datenbankangabe, faellt dann auf den Nutzernamen zurueck).
+    Alle Container laufen "healthy", Funktion nicht beeintraechtigt.
+- Alle drei Cloud-Dienste jetzt live und oeffentlich erreichbar:
+  - Proxy Hosts in NPM angelegt fuer photos.brueggemann.site (Port 2283,
+    inkl. groesserer Upload-Limits: client_max_body_size 50G fuer
+    Videos/RAW-Dateien)
+  - Published Application Route in Cloudflare: photos.brueggemann.site
+    -> 192.168.178.36:80
+  - Oeffentlicher Zugriff getestet: https://photos.brueggemann.site
+- Homepage aktualisiert: Immich ergaenzt (Kategorie "Dokumente & Cloud"),
+  alle drei Cloud-Dienste (Paperless, Nextcloud, Immich) nutzen
+  bewusst die LOKALE URL in der Homepage (schnellerer Zugriff im
+  Heimnetz), waehrend der oeffentliche Zugriff von unterwegs ueber die
+  brueggemann.site-Subdomains laeuft
+
+### Funktionsklaerung: Nextcloud und Immich sind unabhaengig
+Auf Nachfrage geklaert: Nextcloud und Immich teilen sich KEINE Fotos
+automatisch - getrennte Datenbanken, getrennte Speicherorte
+(/mnt/nas6tb/nextcloud/data vs. /mnt/nas6tb/immich/upload). Bewusste
+Entscheidung, beide Dienste getrennt zu betreiben (Immich = Foto-/
+Video-Backup mit KI-Funktionen, Nextcloud = Dokumente/Dateien/Sync).
+Bei Bedarf liesse sich der Immich-Upload-Ordner spaeter als "External
+Storage" read-only in Nextcloud einbinden.
+
+### Naechster Schritt: Partner-Freigabe in Immich
+Immich bietet eingebaute Freigabefunktionen (geteilte Alben, oeffentliche
+Links mit Passwortschutz/Ablaufdatum, Partner-Sharing fuer dauerhafte
+komplette Bibliotheksfreigabe). Einrichtung: zweiter Nutzer-Account unter
+Administration -> Users, danach Partner Sharing in den Account Settings
+des zweiten Nutzers. Noch nicht final eingerichtet, nur Weg dokumentiert.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Kein Backup-Konzept fuer Paperless-, Nextcloud- und jetzt auch
+  Immich-Daten auf /mnt/nas6tb definiert - bei drei produktiven
+  Diensten mit privaten Daten (Dokumente, Fotos) zunehmend dringend.
+- Immich-Partner-Freigabe noch nicht final eingerichtet (nur Weg
+  dokumentiert, siehe oben).
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Backup-Konzept fuer /mnt/nas6tb (Paperless, Nextcloud, Immich)
+   definieren und umsetzen - hoechste Prioritaet, da jetzt drei
+   Dienste mit unwiederbringlichen Nutzerdaten produktiv laufen
+2. Immich Partner-Freigabe einrichten (falls gewuenscht)
+3. QEMU Guest Agent in VM100 installieren
+4. Home-Assistant-API-Token widerrufen und neu setzen
+5. Immich Handy-App einrichten (Server-URL: https://photos.brueggemann.site)
+
+### Zugriff / Referenzen (Ergänzung)
+- Immich (lokal): http://192.168.178.36:2283
+- Immich (öffentlich): https://photos.brueggemann.site
+- Alle drei Cloud-Dienste im Überblick:
+  - Paperless-ngx: lokal 8010, öffentlich paperless.brueggemann.site
+  - Nextcloud: lokal 8020, öffentlich cloud.brueggemann.site
+  - Immich: lokal 2283, öffentlich photos.brueggemann.site
+
+## Aktueller Stand (13.07.2026, Ende Session - alle drei Cloud-Dienste live)
+
+### Vollständig abgeschlossen
+- VM100-Systemdisk von 32GB auf 64GB erweitert (Proxmox-Thin-Pool hatte
+  reichlich Reserve: 15,53% von 175,99GB belegt). Ablauf: qm resize
+  100 scsi0 +32G auf dem Host, danach growpart + resize2fs in der VM
+  (kein LVM in VM100, reines Partitionsschema). Grund: 96% Belegung
+  durch die vielen neuen Docker-Images (Paperless, Nextcloud, Immich
+  zusammen mehrere GB).
+- Immich eingerichtet (stacks/immich/, ghcr.io/immich-app/immich-server
+  + immich-machine-learning + valkey (redis-fork) + ghcr.io/immich-app/
+  postgres mit VectorChord/pgvector-Erweiterung fuer KI-Bildersuche):
+  - Daten auf 6-TB-Platte: /mnt/nas6tb/immich/{upload,pgdata,model-cache}
+  - Lokal erreichbar: http://192.168.178.36:2283
+  - DB_STORAGE_TYPE=HDD gesetzt (6-TB-Platte ist klassische Festplatte,
+    keine SSD - passt Postgres-IO-Einstellungen entsprechend an)
+  - Admin-Account bei Erstaufruf im Browser angelegt (nicht wie bei
+    Nextcloud/Paperless automatisch per .env)
+  - Bekannte harmlose Log-Meldung: "database "samuel" does not exist"
+    wiederholt sich in den Logs (interner Healthcheck verbindet ohne
+    explizite Datenbankangabe, faellt dann auf den Nutzernamen zurueck).
+    Alle Container laufen "healthy", Funktion nicht beeintraechtigt.
+- Alle drei Cloud-Dienste jetzt live und oeffentlich erreichbar:
+  - Proxy Hosts in NPM angelegt fuer photos.brueggemann.site (Port 2283,
+    inkl. groesserer Upload-Limits: client_max_body_size 50G fuer
+    Videos/RAW-Dateien)
+  - Published Application Route in Cloudflare: photos.brueggemann.site
+    -> 192.168.178.36:80
+  - Oeffentlicher Zugriff getestet: https://photos.brueggemann.site
+- Homepage aktualisiert: Immich ergaenzt (Kategorie "Dokumente & Cloud"),
+  alle drei Cloud-Dienste (Paperless, Nextcloud, Immich) nutzen
+  bewusst die LOKALE URL in der Homepage (schnellerer Zugriff im
+  Heimnetz), waehrend der oeffentliche Zugriff von unterwegs ueber die
+  brueggemann.site-Subdomains laeuft
+
+### Funktionsklaerung: Nextcloud und Immich sind unabhaengig
+Auf Nachfrage geklaert: Nextcloud und Immich teilen sich KEINE Fotos
+automatisch - getrennte Datenbanken, getrennte Speicherorte
+(/mnt/nas6tb/nextcloud/data vs. /mnt/nas6tb/immich/upload). Bewusste
+Entscheidung, beide Dienste getrennt zu betreiben (Immich = Foto-/
+Video-Backup mit KI-Funktionen, Nextcloud = Dokumente/Dateien/Sync).
+Bei Bedarf liesse sich der Immich-Upload-Ordner spaeter als "External
+Storage" read-only in Nextcloud einbinden.
+
+### Naechster Schritt: Partner-Freigabe in Immich
+Immich bietet eingebaute Freigabefunktionen (geteilte Alben, oeffentliche
+Links mit Passwortschutz/Ablaufdatum, Partner-Sharing fuer dauerhafte
+komplette Bibliotheksfreigabe). Einrichtung: zweiter Nutzer-Account unter
+Administration -> Users, danach Partner Sharing in den Account Settings
+des zweiten Nutzers. Noch nicht final eingerichtet, nur Weg dokumentiert.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Kein Backup-Konzept fuer Paperless-, Nextcloud- und jetzt auch
+  Immich-Daten auf /mnt/nas6tb definiert - bei drei produktiven
+  Diensten mit privaten Daten (Dokumente, Fotos) zunehmend dringend.
+- Immich-Partner-Freigabe noch nicht final eingerichtet (nur Weg
+  dokumentiert, siehe oben).
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Backup-Konzept fuer /mnt/nas6tb (Paperless, Nextcloud, Immich)
+   definieren und umsetzen - hoechste Prioritaet, da jetzt drei
+   Dienste mit unwiederbringlichen Nutzerdaten produktiv laufen
+2. Immich Partner-Freigabe einrichten (falls gewuenscht)
+3. QEMU Guest Agent in VM100 installieren
+4. Home-Assistant-API-Token widerrufen und neu setzen
+5. Immich Handy-App einrichten (Server-URL: https://photos.brueggemann.site)
+
+### Zugriff / Referenzen (Ergänzung)
+- Immich (lokal): http://192.168.178.36:2283
+- Immich (öffentlich): https://photos.brueggemann.site
+- Alle drei Cloud-Dienste im Überblick:
+  - Paperless-ngx: lokal 8010, öffentlich paperless.brueggemann.site
+  - Nextcloud: lokal 8020, öffentlich cloud.brueggemann.site
+  - Immich: lokal 2283, öffentlich photos.brueggemann.site

@@ -21,6 +21,10 @@
         href: http://192.168.178.36:8020
         description: Dateien, Sync & Kollaboration
         icon: nextcloud.png
+    - Immich:
+        href: http://192.168.178.36:2283
+        description: Foto- & Video-Backup
+        icon: immich.png
 - Verwaltung:
     - Portainer:
         href: https://192.168.178.36:9443
