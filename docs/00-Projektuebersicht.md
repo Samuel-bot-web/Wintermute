@@ -452,3 +452,56 @@ grep '\$' .env pruefen.
 ### Zugriff / Referenzen (Ergänzung)
 - Paperless-ngx (lokal): http://192.168.178.36:8010
 - Paperless-ngx (öffentlich): https://paperless.brueggemann.site
+
+## Aktueller Stand (13.07.2026, Ende Session - Nextcloud live)
+
+### Vollständig abgeschlossen
+- Nextcloud eingerichtet (stacks/nextcloud/, PostgreSQL 16 + Redis 7 +
+  nextcloud:latest, Version 34.0.1.2 bei Installation):
+  - Daten auf 6-TB-Platte: /mnt/nas6tb/nextcloud/{html,data,pgdata,
+    redisdata}
+  - Lokal erreichbar: http://192.168.178.36:8020
+  - Admin-Nutzer samuel bei Installation automatisch angelegt
+  - Trusted Domains gesetzt: cloud.brueggemann.site, 192.168.178.36
+  - Reverse-Proxy-Konfiguration per occ gesetzt: trusted_proxies
+    (172.26.0.1, Docker-Gateway von nextcloud_default), overwriteprotocol
+    (https), overwritehost, overwrite.cli.url (jeweils
+    cloud.brueggemann.site)
+- Proxy Host in Nginx Proxy Manager: cloud.brueggemann.site ->
+  192.168.178.36:8020, inkl. Advanced-Config fuer grosse Uploads
+  (client_max_body_size 10G, erweiterte Timeouts fuer Sync/Uploads)
+- Published Application Route in Cloudflare Tunnel:
+  cloud.brueggemann.site -> 192.168.178.36:80
+- Oeffentlicher Zugriff erfolgreich getestet: https://cloud.brueggemann.site
+- Homepage: Nextcloud-Eintrag ergaenzt (Kategorie "Dokumente & Cloud",
+  lokale URL)
+
+### Wichtige Lehre: NPM-Proxy-Host nicht vergessen
+Beim ersten Test von cloud.brueggemann.site wurde faelschlich auf
+Paperless umgeleitet. Ursache: der Proxy Host in Nginx Proxy Manager
+fuer cloud.brueggemann.site war schlicht noch nicht angelegt worden
+(NPM-Schritt vergessen) - Cloudflare-Route existierte zwar, aber ohne
+passenden NPM-Eintrag griff eine bestehende/Standard-Weiterleitung.
+Lehre: Bei jedem neuen Dienst ZWEI Stellen pruefen, bevor getestet
+wird: (1) Proxy Host in NPM (Hosts -> Proxy Hosts), (2) Published
+Application Route in Cloudflare. Beide muessen existieren, nicht nur
+eine der beiden.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Kein Backup-Konzept fuer Paperless- und jetzt auch Nextcloud-Daten
+  auf /mnt/nas6tb definiert.
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Immich deployen (letzter der drei geplanten Dienste, hoechster
+   Ressourcenbedarf wegen ML-basierter Foto-Indexierung)
+2. QEMU Guest Agent in VM100 installieren
+3. Home-Assistant-API-Token widerrufen und neu setzen
+4. Backup-Konzept fuer Paperless- und Nextcloud-Daten definieren
+
+### Zugriff / Referenzen (Ergänzung)
+- Nextcloud (lokal): http://192.168.178.36:8020
+- Nextcloud (öffentlich): https://cloud.brueggemann.site
