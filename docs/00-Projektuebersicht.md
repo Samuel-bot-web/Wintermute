@@ -339,3 +339,116 @@ werden nicht über den Tunnel veröffentlicht.
 - Cloudflare Zero Trust Dashboard: https://one.dash.cloudflare.com
 - AdGuard-Weboberfläche (korrigiert): http://192.168.178.36:3000
 - Domain: brueggemann.site (Registrar INWX, DNS via Cloudflare)
+
+## Aktueller Stand (13.07.2026, Ende Session - Paperless-ngx live)
+
+### Vollständig abgeschlossen
+- Paperless-ngx eingerichtet (stacks/paperless/, PostgreSQL 16 + Redis 7
+  + ghcr.io/paperless-ngx/paperless-ngx:latest):
+  - Daten auf 6-TB-Platte: /mnt/nas6tb/paperless/{data,media,export,
+    consume,pgdata,redisdata}
+  - Lokal erreichbar: http://192.168.178.36:8010
+  - OCR-Sprachen: Deutsch (Standard) + Englisch
+  - Superuser samuel angelegt
+- Proxy Host in Nginx Proxy Manager: paperless.brueggemann.site ->
+  192.168.178.36:8010 (HTTP, Websockets aktiviert, kein eigenes SSL-
+  Zertifikat noetig - TLS-Terminierung uebernimmt Cloudflare)
+- Published Application Route in Cloudflare Tunnel:
+  paperless.brueggemann.site -> 192.168.178.36:80 (zeigt auf NPMs
+  Proxy-Port, NICHT auf den Admin-Port 81 - NPM routet dann intern
+  per Hostname-Matching zu Paperless)
+- Oeffentlicher Zugriff erfolgreich getestet (Mobilfunknetz):
+  https://paperless.brueggemann.site laeuft mit gueltigem HTTPS
+
+### Wichtige Lehre: Sonderzeichen in .env-Dateien
+Ein Passwort mit "$"-Zeichen in stacks/paperless/.env fuehrte zu
+einem stillen Fehler: Docker Compose interpretiert "$" als Beginn
+einer Variablen-Referenz (${VARIABLE}) und ersetzt unbekannte
+Referenzen durch einen leeren String, OHNE Fehler beim Start zu
+werfen (nur eine leicht zu uebersehende WARN-Zeile). Ergebnis: das
+tatsaechlich in der Datenbank gespeicherte Passwort unterschied sich
+vom absichtlich gesetzten. Erkennbar an: "password authentication
+failed" in den Logs trotz vermeintlich korrekter .env.
+Lehre fuer alle kuenftigen Stacks: Passwoerter in .env-Dateien OHNE
+"$"-Zeichen waehlen (alternativ mit "$$" escapen). Bei "password
+authentication failed"-Fehlern trotz korrekt aussehender .env: mit
+grep '\$' .env pruefen.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Paperless: noch kein Backup-Konzept fuer /mnt/nas6tb/paperless
+  (pgdata + media) definiert - bei Gelegenheit klaeren.
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Nextcloud deployen (Daten auf 6-TB-Platte, gleiche Infrastruktur:
+   NPM-Proxy-Host + Cloudflare Published Application Route)
+2. Danach Immich
+3. QEMU Guest Agent in VM100 installieren
+4. Home-Assistant-API-Token widerrufen und neu setzen
+5. Backup-Konzept fuer Paperless-Daten (und perspektivisch Nextcloud/
+   Immich) definieren
+
+### Zugriff / Referenzen (Ergänzung)
+- Paperless-ngx (lokal): http://192.168.178.36:8010
+- Paperless-ngx (öffentlich): https://paperless.brueggemann.site
+
+## Aktueller Stand (13.07.2026, Ende Session - Paperless-ngx live)
+
+### Vollständig abgeschlossen
+- Paperless-ngx eingerichtet (stacks/paperless/, PostgreSQL 16 + Redis 7
+  + ghcr.io/paperless-ngx/paperless-ngx:latest):
+  - Daten auf 6-TB-Platte: /mnt/nas6tb/paperless/{data,media,export,
+    consume,pgdata,redisdata}
+  - Lokal erreichbar: http://192.168.178.36:8010
+  - OCR-Sprachen: Deutsch (Standard) + Englisch
+  - Superuser samuel angelegt
+- Proxy Host in Nginx Proxy Manager: paperless.brueggemann.site ->
+  192.168.178.36:8010 (HTTP, Websockets aktiviert, kein eigenes SSL-
+  Zertifikat noetig - TLS-Terminierung uebernimmt Cloudflare)
+- Published Application Route in Cloudflare Tunnel:
+  paperless.brueggemann.site -> 192.168.178.36:80 (zeigt auf NPMs
+  Proxy-Port, NICHT auf den Admin-Port 81 - NPM routet dann intern
+  per Hostname-Matching zu Paperless)
+- Oeffentlicher Zugriff erfolgreich getestet (Mobilfunknetz):
+  https://paperless.brueggemann.site laeuft mit gueltigem HTTPS
+- Homepage aktualisiert: neue Kategorie "Dokumente & Cloud" mit
+  Paperless-ngx (lokale URL, damit auch Nextcloud/Immich spaeter dort
+  einsortiert werden koennen)
+
+### Wichtige Lehre: Sonderzeichen in .env-Dateien
+Ein Passwort mit "$"-Zeichen in stacks/paperless/.env fuehrte zu
+einem stillen Fehler: Docker Compose interpretiert "$" als Beginn
+einer Variablen-Referenz (${VARIABLE}) und ersetzt unbekannte
+Referenzen durch einen leeren String, OHNE Fehler beim Start zu
+werfen (nur eine leicht zu uebersehende WARN-Zeile). Ergebnis: das
+tatsaechlich in der Datenbank gespeicherte Passwort unterschied sich
+vom absichtlich gesetzten. Erkennbar an: "password authentication
+failed" in den Logs trotz vermeintlich korrekter .env.
+Lehre fuer alle kuenftigen Stacks: Passwoerter in .env-Dateien OHNE
+"$"-Zeichen waehlen (alternativ mit "$$" escapen). Bei "password
+authentication failed"-Fehlern trotz korrekt aussehender .env: mit
+grep '\$' .env pruefen.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Paperless: noch kein Backup-Konzept fuer /mnt/nas6tb/paperless
+  (pgdata + media) definiert - bei Gelegenheit klaeren.
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Nextcloud deployen (Daten auf 6-TB-Platte, gleiche Infrastruktur:
+   NPM-Proxy-Host + Cloudflare Published Application Route)
+2. Danach Immich
+3. QEMU Guest Agent in VM100 installieren
+4. Home-Assistant-API-Token widerrufen und neu setzen
+5. Backup-Konzept fuer Paperless-Daten (und perspektivisch Nextcloud/
+   Immich) definieren
+
+### Zugriff / Referenzen (Ergänzung)
+- Paperless-ngx (lokal): http://192.168.178.36:8010
+- Paperless-ngx (öffentlich): https://paperless.brueggemann.site

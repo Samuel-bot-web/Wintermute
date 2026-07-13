@@ -12,6 +12,11 @@
         href: http://192.168.178.36:8096
         description: Filme & Serien
         icon: jellyfin.png
+- Dokumente & Cloud:
+    - Paperless-ngx:
+        href: http://192.168.178.36:8010
+        description: Dokumentenverwaltung
+        icon: paperless-ngx.png
 - Verwaltung:
     - Portainer:
         href: https://192.168.178.36:9443
