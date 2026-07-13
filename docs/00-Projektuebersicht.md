@@ -711,3 +711,89 @@ des zweiten Nutzers. Noch nicht final eingerichtet, nur Weg dokumentiert.
 4. Home-Assistant-API-Token erneuern
 5. RAM-Aufruestung (2x 8GB DDR4-2400 UDIMM 2Rx8, bestellt/in Pruefung)
    einbauen und Speicherzuweisung der VMs anpassen
+
+## Aktueller Stand (13.07.2026, Ende Session - GPU-ML, RAM-Planung, 2. Foto-Import)
+
+### Vollständig abgeschlossen
+- Immich Machine-Learning-Beschleunigung per Gaming-PC eingerichtet:
+  - Docker Desktop + WSL2 auf Windows-Gaming-PC installiert (RTX 3080,
+    10GB VRAM, GPU-Passthrough in Docker bestaetigt)
+  - Container immich-ml-gpu (ghcr.io/immich-app/immich-machine-learning:
+    release-cuda) laeuft auf dem Gaming-PC (192.168.178.25:3003)
+  - In Immich (Administration -> Settings -> Machine Learning) als
+    PRIMAERE URL eingetragen, Server-interner ML-Dienst bleibt als
+    Fallback-URL bestehen (Immich probiert URLs der Reihe nach durch)
+  - Bestaetigt per Logs: CUDAExecutionProvider wird fuer alle Modelle
+    (Gesichtserkennung, OCR, CLIP/Smart Search) genutzt
+  - Gedacht als temporaere Beschleunigung fuer grosse Imports, nicht
+    zwingend dauerhaft - Container einfach stoppen/starten
+    (docker stop/start immich-ml-gpu), Immich faellt automatisch auf
+    den Server-Fallback zurueck
+
+- RAM-Aufruestung geplant (noch nicht eingebaut): 2x 8GB DDR4-2400
+  UDIMM 2Rx8 non-ECC bestellt (BRAINZAP, kompatibel zu vorhandenen
+  Crucial Ballistix Sport LT BLS8G4D240FSB.16FARG-Modulen, ebenfalls
+  Dual-Rank/2Rx8). Board (Gigabyte Z170-HD3P-CF) unterstuetzt bis 64GB
+  auf 4 Slots, aktuell 2 belegt/2 frei. Grund: VMs allein beanspruchen
+  12GB (VM100: 8GB, VM101: 4GB) von physisch 16GB, Host bekommt nur
+  ~4GB, sichtbar an Swap-Nutzung (3,1GB belegt). Ziel nach Einbau:
+  32GB gesamt, danach VM-Speicherzuweisungen neu verteilen.
+
+- Watchtower-Bugfix (siehe vorheriger Eintrag) + Labels fuer NPM,
+  Samba, Cloudflared ergaenzt - automatische Updates laufen jetzt
+  taeglich um 4 Uhr wie vorgesehen.
+
+- Zweite externe Festplatte importiert (WD, 3,6TB, Serial
+  WD-WX82DC4KCY74): Bilder-Ordner (1,5TB) per rsync in
+  /mnt/nas6tb/immich/external/platte2-bilder/ kopiert. Enthaelt u.a.
+  Hochzeitsfotos, Kalenderbilder, Urlaubsfotos (Meer, Senegal),
+  Reitsport-Videos (Norma), Lightroom/Luminar-Kataloge, Sprites/
+  Wallpaper-Sammlungen.
+  - SMART-Check der Quellplatte: Current_Pending_Sector=1,
+    Reallocated_Sector_Ct=0, Gesamtstatus PASSED - vermutlich
+    isolierter Einzelsektor-Defekt, nicht akut kritisch, aber im
+    Blick behalten
+  - Betroffener Ordner "2023/Urlaub bad Schandau/Ausgabe" laesst sich
+    wegen des Sektordefekts nicht vollstaendig lesen (readdir I/O
+    error) - Rest der 1,5TB erfolgreich kopiert und verifiziert
+
+### Wichtige Lehre: Zielordner-Berechtigungen vor rsync pruefen
+Der Zielordner platte2-bilder/Wallpaper (und weitere Unterordner)
+gehoerten unerwartet dhcpcd:netdev mit 0700-Rechten statt dem
+eigenen Nutzer samuel - Ursache nicht abschliessend geklaert
+(vermutlich ein anderer Prozess/Container hat den Ordner mit
+abweichender UID angelegt, bevor rsync lief). Fuehrte zu hunderten
+"Permission denied"-Fehlern beim ersten Kopierversuch.
+Lehre: Bei komplexen Zielverzeichnissen (insbesondere unterhalb von
+Docker-Volume-Mounts) vor grossen rsync-Uebertragungen pruefen:
+stat <zielordner> - insbesondere nach fehlgeschlagenen/abgebrochenen
+vorherigen Laeufen. Fix: sudo chown -R <user>:<user> <ordner> &&
+sudo chmod -R u+rwX,go+rX <ordner> VOR dem naechsten rsync-Versuch,
+nicht danach.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- QEMU Guest Agent laeuft nicht in VM100.
+- Home-Assistant-Live-Status-Widget in Homepage: weiterhin 401.
+- Home-Assistant-API-Token: weiterhin ausstehend zu widerrufen/ersetzen.
+- 4-TB-Platte (/mnt/media) ist zu 99% voll (~69 GB frei).
+- Kein Backup-Konzept fuer Paperless-, Nextcloud- und Immich-Daten auf
+  /mnt/nas6tb definiert - weiterhin hoechste Prioritaet.
+- RAM-Module bestellt, aber noch nicht eingebaut.
+- "2023/Urlaub bad Schandau/Ausgabe" auf der WD-Platte teilweise
+  unlesbar (SMART-Sektordefekt) - bei Interesse spaeter gezielter
+  Rettungsversuch mit ddrescue moeglich.
+- Immich Partner-Freigabe weiterhin nicht final eingerichtet.
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. RAM-Module einbauen, 32GB verifizieren, VM-Speicherzuweisungen
+   anpassen
+2. Backup-Konzept fuer /mnt/nas6tb definieren und umsetzen
+3. Weitere externe Festplatten nach etabliertem Muster importieren
+   (Berechtigungen vorab pruefen!)
+4. Immich Partner-Freigabe einrichten
+5. QEMU Guest Agent installieren, Home-Assistant-Token erneuern
+
+### Zugriff / Referenzen (Ergänzung)
+- Immich Machine Learning (Gaming-PC, temporaer): 192.168.178.25:3003
+- Immich External Libraries: /mnt/nas6tb/immich/external/
+  {platte1-bilder, platte2-bilder}
