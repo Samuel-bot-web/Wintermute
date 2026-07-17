@@ -797,3 +797,120 @@ nicht danach.
 - Immich Machine Learning (Gaming-PC, temporaer): 192.168.178.25:3003
 - Immich External Libraries: /mnt/nas6tb/immich/external/
   {platte1-bilder, platte2-bilder}
+  
+## Aktueller Stand (17.07.2026 - Intel iGPU Passthrough, kritischer Nextcloud-Vorfall)
+
+### Vollständig abgeschlossen: Intel Quick Sync Hardware-Transkodierung
+- VT-d im BIOS war bereits aktiviert (Gigabyte-Board), IOMMU-Kernel-
+  Parameter (intel_iommu=on iommu=pt) zusätzlich in GRUB gesetzt -
+  WICHTIG: System nutzt klassisches GRUB (BIOS-Boot), NICHT
+  proxmox-boot-tool/systemd-boot. Aenderungen gehoeren in
+  /etc/default/grub (GRUB_CMDLINE_LINUX_DEFAULT), danach
+  sudo update-grub - NICHT /etc/kernel/cmdline, das greift bei diesem
+  System nicht.
+- vfio-pci als Treiber fuer die iGPU (Intel HD 530, PCI-ID 8086:1912)
+  konfiguriert (/etc/modprobe.d/vfio.conf), i915 auf Host-Ebene
+  geblacklistet (/etc/modprobe.d/blacklist.conf)
+- iGPU per PCI-Passthrough an VM100 durchgereicht:
+  sudo qm set 100 -hostpci0 00:02.0,pcie=1,x-vga=0
+  Host selbst hat dadurch keine eigene Grafikausgabe mehr fuer die
+  Linux-Konsole (BIOS/GRUB-Anzeige bleibt aber erhalten, da vor
+  Kernel-Uebernahme durch vfio-pci)
+- In VM100 laedt automatisch der i915-Treiber fuer die durchgereichte
+  Karte, /dev/dri/{card0,card1,renderD128} verfuegbar
+- Jellyfin-Container um GPU-Geraetezugriff erweitert
+  (stacks/jellyfin/compose.yml: devices: /dev/dri:/dev/dri)
+- Hardware-Beschleunigung in Jellyfin aktiviert (Dashboard -> Playback
+  -> Transcoding: Intel QuickSync/QSV, VA-API Device
+  /dev/dri/renderD128), inkl. Trickplay-Hardwarebeschleunigung
+  (Dashboard -> Playback -> Trickplay)
+
+### WICHTIGE EINSCHRAENKUNG: Kein HDR/Dolby-Vision-Support
+Die Intel HD 530 (Skylake, Gen9) kann laut Herstellerspezifikation
+KEIN 10-bit-HEVC (HEVC Profile 2) hardwarebeschleunigt decodieren -
+das betrifft praktisch alle HDR- und Dolby-Vision-Inhalte. Symptom:
+Stream-Abstuerze auf Mobilgeraeten bei HDR-Filmen, Trickplay-Fehler
+mit "No support for codec hevc profile 2".
+Fix: Dashboard -> Playback -> Transcoding -> "Enable hardware
+decoding for" -> HEVC (bzw. "HEVC 10-bit" falls separat aufgefuehrt)
+DEAKTIVIERT. Diese Inhalte fallen automatisch auf Software-Decoding
+zurueck (funktioniert, aber langsamer gestartet, mehr CPU-Last nur
+fuer HDR-Titel). Normales H.264 und 8-bit-HEVC bleiben
+hardwarebeschleunigt.
+Langfristige Loesung waere ein CPU-Upgrade auf 7. Generation
+"Kaby Lake" (z.B. i5-7500 oder i7-7700) - das Board (GA-Z170-HD3P)
+unterstuetzt das offiziell per BIOS-Update, volle HEVC-10bit/Dolby-
+Vision-Hardwareunterstuetzung ab Gen9.5-Grafik (UHD 630). Nicht
+umgesetzt, nur recherchiert als moegliche kuenftige Massnahme.
+CPU-Obergrenze fuer dieses Board ist i7-7700 (Coffee Lake/8. Gen wird
+von Intel elektronisch gesperrt, kein BIOS-Update hilft dagegen).
+
+### KRITISCHER VORFALL: Nextcloud OOM, System fast kollabiert
+Am 17.07. gegen 08:43 Uhr: Host bei CPU 100%, RAM 96,5%, Swap 100%
+voll, Load Average 60 auf 4 Kernen. Immich (zu dem Zeitpunkt vom
+Nutzer bereits manuell deaktiviert) zeigte "Exited" - vermutlich vom
+Kernel OOM-gekillt, nicht die eigentliche Ursache.
+Ursache identifiziert: nextcloud-Container zeigte 373% CPU und
+17,4GB RAM - dutzende apache2-Worker-Prozesse (400-500MB je Prozess)
+ohne jegliches Speicherlimit, ueber Stunden akkumuliert. Auslöser
+vermutlich (nicht abschliessend bestaetigt): eine Android-Nextcloud-
+App mit veraltetem/ungueltigem App-Passwort, die wiederholt gegen den
+eingebauten Brute-Force-Schutz lief (Log zeigt wiederholte
+"TooManyRequests"-Exceptions von Nextcloud-android/34.0.1).
+Sofortmassnahme: docker compose restart nextcloud - System erholte
+sich sofort (RAM von 237MB frei auf 16GB frei, Swap von 100% auf
+faktisch leer).
+Dauerhafter Fix: Speicherlimit in stacks/nextcloud/compose.yml
+ergaenzt (deploy.resources.limits.memory: 4G beim app-Service) -
+verhindert kuenftig, dass ein einzelner Container den gesamten Host
+in die Knie zwingen kann.
+
+### Sicherheitshinweis aus den Nextcloud-Logs
+In den Logs sichtbar: automatisierte Exploit-Scan-Versuche von
+aussen (Pfad-Traversal-Versuche wie /etc/passwd, bekannte Router-
+Backdoor-Pfade wie /boafrm/formSysCmd). Alle liefen ins Leere
+(Nextcloud hat korrekt abgelehnt), aber bestaetigt: seit der
+oeffentlichen Freigabe treffen reale automatisierte Angriffsversuche
+ein, nicht nur theoretisch. Ueberlegenswert: Cloudflare WAF
+(kostenlos im bestehenden Tunnel-Setup verfuegbar) vorschalten, um
+solche Anfragen bereits vor Nextcloud abzufangen. Noch nicht
+umgesetzt.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Android-Nextcloud-App-Login pruefen/erneuern (vermutete Ursache des
+  OOM-Vorfalls) - noch nicht durchgefuehrt
+- 4 Google-Kalender-Abonnements liefern 401 Unauthorized (Google hat
+  vermutlich Zugriff widerrufen/URL erfordert jetzt Anmeldung) -
+  unter Einstellungen -> Kalender -> Abonnements neu einzurichten
+- Cloudflare WAF fuer zusaetzlichen Schutz vor Nextcloud noch nicht
+  eingerichtet
+- Kein Speicherlimit fuer andere Container gesetzt (nur Nextcloud
+  bisher) - ggf. auch fuer andere ressourcenintensive Dienste
+  (Paperless, Immich bei Reaktivierung) sinnvoll
+- Immich weiterhin vom Nutzer deaktiviert (Grund nicht dokumentiert,
+  vermutlich RAM-Engpaesse waehrend der IOMMU/GPU-Arbeiten)
+- Backup-Konzept fuer /mnt/nas6tb weiterhin nicht umgesetzt -
+  angesichts des heutigen Vorfalls (System nahe am Kollaps) umso
+  dringlicher
+- Jellyfin oeffentliche Route (jellyfin.brueggemann.site) wurde
+  besprochen, aber laut Nutzer-Entscheidung ("Überprüfen wir das
+  erst mal") NICHT umgesetzt - Sicherheitscheck (Nutzer-Passwoerter,
+  Quick-Connect-Verhalten) wurde durchgefuehrt und fuer unbedenklich
+  befunden, NPM/Cloudflare-Route aber nie tatsaechlich angelegt
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Backup-Konzept fuer /mnt/nas6tb definieren und umsetzen (nach dem
+   heutigen Beinahe-Ausfall hoechste Prioritaet)
+2. Android-Nextcloud-App-Verbindung pruefen und erneuern
+3. Speicherlimits fuer weitere Container in Erwaegung ziehen
+4. Cloudflare WAF pruefen/einrichten
+5. Google-Kalender-Abos in Nextcloud neu verbinden
+6. Falls gewuenscht: Jellyfin oeffentliche Route final einrichten
+   (Sicherheitscheck bereits erledigt)
+7. Falls gewuenscht: CPU-Upgrade auf i5-7500/i7-7700 fuer volles
+   HDR/Dolby-Vision-Hardware-Transcoding
+
+### Zugriff / Referenzen (Ergänzung)
+- Jellyfin Hardware-Transcoding: aktiv fuer H.264/8bit-HEVC, Software-
+  Fallback fuer HDR/10bit-HEVC/Dolby Vision
+- GPU-Passthrough: VM100 hostpci0 = Proxmox-Host iGPU (00:02.0)
