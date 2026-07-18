@@ -1,6 +1,6 @@
 # Hardware – Wintermute
 
-Stand: 13.07.2026
+Stand: 18.07.2026
 
 ## System
 - **Mainboard:** Gigabyte Z170-HD3P-CF
