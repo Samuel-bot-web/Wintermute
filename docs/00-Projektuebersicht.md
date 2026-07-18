@@ -914,3 +914,163 @@ umgesetzt.
 - Jellyfin Hardware-Transcoding: aktiv fuer H.264/8bit-HEVC, Software-
   Fallback fuer HDR/10bit-HEVC/Dolby Vision
 - GPU-Passthrough: VM100 hostpci0 = Proxmox-Host iGPU (00:02.0)
+
+## Aktueller Stand (17.-18.07.2026 - Backup-System vollstaendig eingerichtet)
+
+### Vollständig abgeschlossen: Verschlüsseltes automatisiertes Backup-System
+
+**Hardware:**
+- Externe 4-TB-USB-Festplatte (WD Elements, Serial WD-WXU2E7032L5S,
+  Modell WDC_WD40NDZW-11A8JS1), dauerhaft am Proxmox-Host angeschlossen
+- LUKS2-verschlüsselt, EIGENE Passphrase (getrennt von media4tb/
+  media6tb, bewusst isoliert)
+- Automatisierungs-Keyfile (/etc/cryptsetup-keys.d/backup-4tb.key)
+  als zusaetzlicher Key-Slot - NICHT in crypttab eingetragen, Platte
+  bleibt beim normalen Boot verschlossen, wird nur gezielt vom
+  Backup-Skript geoeffnet und nach jedem Lauf wieder geschlossen
+  (luksOpen -> Arbeit -> luksClose)
+
+**Software-Stack:**
+- Kopia (v0.23.1) nativ auf dem Proxmox-Host installiert (nicht in
+  Docker/VM100) - Grund: Backup-Platte haengt am Host, ein LUKS-
+  open/close-Zyklus laesst sich so ohne VM-Grenze automatisieren
+- Repository liegt auf der Backup-Platte (/mnt/backup4tb/kopia-repo),
+  AES256-GCM-HMAC-SHA256-Verschluesselung, eigenes Repository-Passwort
+  (dritte, unabhaengige Verschluesselungsebene zusaetzlich zu LUKS)
+- Kompression: zstd aktiviert (global policy)
+- Standard-Retention: 7 taeglich / 4 woechentlich / 24 monatlich /
+  3 jaehrlich (Kopia-Standardwerte, nicht angepasst)
+- Kopia-Weboberflaeche als systemd-Dienst (kopia-server.service),
+  dauerhaft erreichbar unter https://192.168.178.37:51515
+  (selbstsigniertes Zertifikat, Browser-Warnung normal)
+
+### Backup-Skript (/root/backup-nightly.sh)
+
+Ablauf:
+1. Lock-Datei-Pruefung (/var/run/backup-nightly.lock) - verhindert
+   ueberlappende Laeufe, falls ein Durchlauf ungewoehnlich lange dauert
+2. Backup-Platte per Keyfile oeffnen und mounten
+3. Postgres-Dumps ueber SSH auf VM100 (pg_dump in paperless-db und
+   nextcloud-db Containern, KEIN roher Dateikopie-Ansatz - wichtig fuer
+   Konsistenz waehrend die Dienste laufen)
+4. rsync des kompletten ~/homeserver-Verzeichnisses von VM100
+   (deckt automatisch ALLE Docker-Stack-Configs ab, auch neu
+   hinzugefuegte - AUSSER stacks/adguard/work/data und
+   AdGuardHome.yaml, die root-only Berechtigungen haben; rsync mit
+   || true abgesichert, damit einzelne Permission-Fehler den
+   Gesamtlauf nicht abbrechen)
+5. Kopia-Snapshots: /mnt/nas6tb/{paperless,nextcloud,kavita,immich}
+   (Immich nur falls Ordner existiert - Absicherung falls Dienst
+   deaktiviert ist), Datenbank-Dumps, homeserver-Configs
+6. Home-Assistant-Backup (VM101): ha backups new per SSH ausgeloest,
+   dann per "cat ... | tee" uebertragen (NICHT scp/sftp - siehe
+   Lehre unten), danach als eigener Kopia-Snapshot gesichert
+7. Backup-Platte sauber unmounten und luksClose
+
+**Explizit NICHT gesichert:** Jellyfin-Mediathek (/mnt/media) - zu
+gross fuer 4TB, bewusste Nutzerentscheidung, Filme/Serien sind
+ohnehin durch Neubeschaffung ersetzbar
+
+### SSH-Infrastruktur fuer Automatisierung
+- Eigener SSH-Keypair auf dem Host fuer root (/root/.ssh/
+  id_ed25519_backup), Public Key sowohl in VM100 (~/.ssh/
+  authorized_keys) als auch im Home-Assistant-SSH-Add-on
+  (authorized_keys-Option) hinterlegt
+- VM101/Home Assistant: KEIN Standard-SSH (Port 22 blockiert von
+  Home Assistant OS) - "Advanced SSH & Web Terminal"-Add-on
+  installiert, laeuft auf Port 22222, im gesicherten Modus
+
+### Wichtige Lehren aus der Einrichtung
+
+**1. rsync/set -e Kombination bricht Skripte bei kleinen Fehlern ab**
+Ein einzelner rsync-Fehler (Permission denied bei AdGuard-Dateien)
+hat wegen "set -e" am Anfang das GESAMTE Skript abgebrochen, inkl.
+offen gebliebener LUKS-Platte. Lehre: kritische, nicht-fatale Schritte
+mit "|| true" absichern, damit die Platte in jedem Fall sauber
+geschlossen wird.
+
+**2. Manuell im Terminal gestartete Skripte sterben bei SSH-Trennung**
+Ein manueller Testlauf (ohne nohup) wurde durch Strg+C des
+tail-Befehls in DERSELBEN Sitzung unbeabsichtigt per SIGHUP beendet,
+mitten im Kavita-Snapshot, nach ~9 Stunden Laufzeit, ohne
+Fehlermeldung im Log - die Platte blieb offen. Lehre: manuelle Tests
+IMMER mit "nohup ... & disown" starten, damit SSH-Verbindungsabbrueche
+den Prozess nicht toeten. Der automatisierte Cronjob ist von diesem
+Problem nicht betroffen (Cron startet grundsaetzlich entkoppelt).
+
+**3. Windows-OpenSSH-Client-Bug bei bestimmten SSH-Servern**
+"Corrupted MAC on input"-Fehler beim Verbinden zum Home-Assistant-
+SSH-Add-on von Windows aus - bekannter Bug im umac-128-etm-Algorithmus
+des Windows-eigenen OpenSSH-Clients. Fix: -o MACs=hmac-sha2-256-etm@
+openssh.com erzwingen (per SSH-Flag oder in ~/.ssh/config hinterlegt).
+Achtung bei Windows: Notepad speichert config-Dateien gerne als
+"config.txt" statt "config" - mit Get-ChildItem pruefen.
+
+**4. Home-Assistant "ha"-CLI braucht Login-Shell**
+Nicht-interaktive SSH-Befehle (ssh host "ha backups new") schlagen
+mit "unauthorized: missing or invalid API token" fehl, weil die
+SUPERVISOR_TOKEN-Umgebungsvariable nur in einer echten Login-Shell
+gesetzt wird. Fix: Befehle immer als ssh host "bash -lc 'befehl'"
+ausfuehren.
+
+**5. SFTP im Advanced-SSH-Add-on erfordert Nutzername "root"**
+Mit ssh.username=samuel UND ssh.sftp=true stuerzt das Add-on beim
+Start komplett ab (Crash-Loop). Fix: entweder Username auf root
+aendern, ODER (gewaehlter Weg) SFTP deaktiviert lassen und
+stattdessen "ssh host cat datei > lokale-datei" fuer Dateitransfer
+nutzen - funktioniert ohne SFTP-Subsystem ueber den normalen
+SSH-Kanal.
+
+**6. Immich-Erstsicherung ist sehr langwierig**
+Erster vollstaendiger Kopia-Snapshot von /mnt/nas6tb/immich (2TB,
+viele Einzeldateien: RAW-Fotos, Thumbnails) hat fast 10 Stunden
+gedauert. Folgelaeufe werden durch Kopias Deduplizierung (nur
+neue/geaenderte Dateien) deutlich schneller erwartet, aber
+unbestaetigt - im Blick behalten, ob der taegliche 3-Uhr-Zeitraum
+ausreicht.
+
+### Cronjob
+0 3 * * * /root/backup-nightly.sh
+
+Als root-Crontab eingetragen (sudo crontab -e). Erster automatischer
+Lauf: Nacht auf 19.07.2026.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Restore-Vorgang noch NICHT getestet - hohe Prioritaet fuer naechste
+  Session, ein ungetestetes Backup ist kein verlaessliches Backup
+- AdGuard-Konfiguration wird weiterhin NICHT gesichert (Berechtigungs-
+  problem umgangen, nicht geloest) - bei Bedarf spaeter Root-Cause
+  klaeren (moeglicherweise via docker exec statt rsync-Dateizugriff)
+- Immich-Datenbank wird aktuell OHNE pg_dump-Vorstufe roh mitkopiert
+  (wie Paperless/Nextcloud vor deren Fix) - potenzielles
+  Konsistenzrisiko bei laufendem Snapshot, noch nicht behoben
+- Backup-Skript sichert aktuell nur Paperless/Nextcloud/Kavita/Immich
+  explizit einzeln aufgelistet - Umstellung auf dynamische Schleife
+  ueber alle /mnt/nas6tb/*-Unterordner besprochen, aber nicht
+  umgesetzt (würde neue Dienste automatisch mit abdecken, ausser
+  deren Datenbank-Dumps)
+- Kopia-Weboberflaeche und CLI-gestartete Snapshots laufen als
+  getrennte Prozesse - Snapshots aus dem Cronjob erscheinen NICHT im
+  "Tasks"-Bereich der Web-UI, nur eigene Server-initiierte Aktionen
+  (Wartung etc.) - kein Fehler, nur eine Einschraenkung bei der
+  Fortschrittsbeobachtung
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Restore-Test durchfuehren (mind. eine Datei/einen Ordner aus
+   einem Snapshot zurueckspielen, um den Ablauf zu verifizieren)
+2. Ersten automatischen 3-Uhr-Lauf pruefen (Log durchsehen, Laufzeit
+   im Vergleich zum 19h-Erstlauf einordnen)
+3. Immich-Postgres-Dump ergaenzen (Konsistenz-Fix analog zu
+   Paperless/Nextcloud)
+4. AdGuard-Backup-Luecke schliessen
+5. Ggf. dynamische Ordner-Schleife fuer /mnt/nas6tb/* einbauen, um
+   kuenftige neue Dienste automatisch abzudecken
+
+### Zugriff / Referenzen (Ergänzung)
+- Kopia-Weboberflaeche: https://192.168.178.37:51515 (Login: samuel)
+- Kopia-Repository-Passwort: separat im Passwort-Manager hinterlegt
+- Backup-Skript: /root/backup-nightly.sh
+- Backup-Log: /var/log/kopia-backup.log
+- Backup-Platte: /dev/disk/by-id/ata-WDC_WD40NDZW-11A8JS1_WD-WXU2E7032L5S
+- HA SSH-Add-on: Port 22222, MAC-Algorithmus muss explizit auf
+  hmac-sha2-256-etm@openssh.com gesetzt werden (Windows-Client-Bug)
