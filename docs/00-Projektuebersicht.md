@@ -1074,3 +1074,20 @@ Lauf: Nacht auf 19.07.2026.
 - Backup-Platte: /dev/disk/by-id/ata-WDC_WD40NDZW-11A8JS1_WD-WXU2E7032L5S
 - HA SSH-Add-on: Port 22222, MAC-Algorithmus muss explizit auf
   hmac-sha2-256-etm@openssh.com gesetzt werden (Windows-Client-Bug)
+
+## Aktueller Stand (19.07.2026 - Cron-PATH-Bugfix im Backup-Skript)
+
+### Wichtiger Bugfix: Erster automatischer 3-Uhr-Lauf schlug fehl
+Der erste echte Cronjob-Lauf (19.07., 03:00 Uhr) brach sofort mit
+"cryptsetup: Kommando nicht gefunden" ab. Ursache: Cron nutzt einen
+stark eingeschraenkten PATH (typischerweise nur /usr/bin:/bin), der
+/usr/sbin (wo cryptsetup liegt) nicht enthaelt - im Gegensatz zur
+interaktiven Shell, in der wir das Skript zuvor erfolgreich getestet
+hatten. Das erklaert, warum manuelle Tests immer funktionierten, der
+automatisierte Cronjob aber nicht.
+Fix: export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+direkt als zweite Zeile im Skript (nach der Shebang) ergaenzt.
+Lehre: Bei jedem Cron-gesteuerten Skript, das Systembefehle aus /sbin
+oder /usr/sbin nutzt (cryptsetup, mount als root, etc.), den PATH
+explizit im Skript setzen - sich nicht auf die interaktive Shell-
+Umgebung verlassen, in der getestet wurde.
