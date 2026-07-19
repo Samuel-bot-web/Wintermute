@@ -1,0 +1,40 @@
+/* Kartenhintergrund weiß statt dunkel, plus Mattglas-Blur */
+.service-card {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Schrift innerhalb der Karten dunkel, damit sie auf Weiß lesbar bleibt */
+.service-card,
+.service-card * {
+  color: #18181b !important;
+}
+
+/* Status-Badges (RUNNING/HEALTHY/EXITED etc.) ihre ursprüngliche Farbe zurückgeben */
+.service-card [class*="text-emerald"] { color: #059669 !important; }
+.service-card [class*="text-green"]   { color: #16a34a !important; }
+.service-card [class*="text-red"]     { color: #dc2626 !important; }
+.service-card [class*="text-rose"]    { color: #e11d48 !important; }
+.service-card [class*="text-amber"]   { color: #d97706 !important; }
+.service-card [class*="text-yellow"]  { color: #ca8a04 !important; }
+.service-card [class*="text-sky"]     { color: #0284c7 !important; }
+.service-card [class*="text-blue"]    { color: #2563eb !important; }
+/* Puffer für sanften Parallax-Scroll, damit keine Bildränder sichtbar werden */
+#background {
+  top: -60px !important;
+  height: calc(100% + 120px) !important;
+  will-change: transform;
+}
+/* Kontrastreicherer Hintergrund für die Status-Box selbst */
+.docker-status-healthy,
+.docker-status-running {
+  background-color: rgba(5, 150, 105, 0.18) !important;
+}
+.docker-status-exited,
+.docker-status-unhealthy,
+.docker-status-degraded {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
+.docker-status-starting {
+  background-color: rgba(2, 132, 199, 0.18) !important;
+}

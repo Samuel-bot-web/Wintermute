@@ -1,28 +1,98 @@
 - Netzwerk:
     - AdGuard:
-        href: http://192.168.178.36
-        description: DNS & Werbeblocker
+        href: http://192.168.178.36:3000/
+        description: DNS-Werbeblocker
         icon: adguard-home.png
+        server: my-docker
+        container: adguard
+        widget:
+          type: adguard
+          url: http://192.168.178.36:3000
+          username: "{{HOMEPAGE_VAR_ADGUARD_USER}}"
+          password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
+          fields: ["queries", "blocked", "filtered", "latency"]
+
+    - Samba:
+        href: http://192.168.178.36/
+        description: Netzwerkfreigabe
+        icon: samba-server.png
+        server: my-docker
+        container: samba
 
 - Medien:
     - Jellyfin:
-        href: http://192.168.178.36:8096
-        description: Filme & Serien
+        href: http://192.168.178.36:8096/
+        description: Mediaserver
         icon: jellyfin.png
+        server: my-docker
+        container: jellyfin
+        widget:
+          type: jellyfin
+          url: http://192.168.178.36:8096
+          key: "{{HOMEPAGE_VAR_JELLYFIN_KEY}}"
+          enableBlocks: true
+          enableNowPlaying: true
+          fields: ["movies", "series", "episodes"]
+
+    - Kavita:
+        href: http://192.168.178.36:8030/
+        description: E-Book & Comic Reader
+        icon: kavita.png
+        server: my-docker
+        container: kavita
+
+- Dokumente & Cloud:
+    - Paperless-ngx:
+        href: http://192.168.178.36:8010/
+        description: Dokumentenverwaltung
+        icon: paperless-ngx.png
+        server: my-docker
+        container: paperless
+
+    - Nextcloud:
+        href: http://192.168.178.36:8020/
+        description: Cloud-Speicher
+        icon: nextcloud.png
+        server: my-docker
+        container: nextcloud
+
+    - Immich:
+        href: http://192.168.178.36:2283/
+        description: Foto- & Videoverwaltung
+        icon: immich.png
+        server: my-docker
+        container: immich_server
 
 - Verwaltung:
     - Portainer:
-        href: https://192.168.178.36:9443
-        description: Docker-Verwaltung
+        href: http://192.168.178.36:9000/
+        description: Container-Verwaltung
         icon: portainer.png
+        server: my-docker
+        container: portainer
 
     - Watchtower:
-        href: http://192.168.178.36:8080
-        description: Docker-Update-Service
+        href: http://192.168.178.36:3001/
+        description: Automatische Updates
         icon: watchtower.png
+        server: my-docker
+        container: watchtower
+
+    - Kopia:
+        href: https://192.168.178.37:51515/snapshots
+        description: Backup tool
+        icon: kopia.png
+        
+- Infrastruktur:
+    - Nginx Proxy Manager:
+        href: http://192.168.178.36:81/
+        description: Reverse Proxy
+        icon: nginx-proxy-manager.png
+        server: my-docker
+        container: npm
 
 - Smart Home:
     - Home Assistant:
-        href: http://192.168.178.36:8123
-        description: Smart-Home-Zentrale
+        href: http://192.168.178.38:8123/
+        description: Smart Home Steuerung
         icon: home-assistant.png

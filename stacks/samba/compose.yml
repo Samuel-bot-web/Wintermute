@@ -1,0 +1,20 @@
+services:
+  samba:
+    image: dperson/samba
+    container_name: samba
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    environment:
+      TZ: Europe/Berlin
+    ports:
+      - "139:139"
+      - "445:445"
+    volumes:
+      - /mnt/media:/media
+      - /mnt/nas6tb:/nas6tb
+    command: >
+      -p
+      -u "${SAMBA_USER1};${SAMBA_PASS1}"
+      -s "media;/media;yes;no;no;${SAMBA_USER1}"
+      -s "nas6tb;/nas6tb;yes;no;no;${SAMBA_USER1}"

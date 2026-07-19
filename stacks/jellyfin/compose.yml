@@ -3,6 +3,8 @@ services:
     image: jellyfin/jellyfin
     container_name: jellyfin
     restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri
 
     ports:
       - "8096:8096"

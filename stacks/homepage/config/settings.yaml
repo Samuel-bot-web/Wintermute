@@ -1,11 +1,19 @@
 ---
 # For configuration options and examples, please see:
 # https://gethomepage.dev/configs/settings/
-
 title: Wintermute
 description: Homeserver Dashboard
-
+providers:
+  openweathermap: openweathermapapikey
+  weatherapi: weatherapiapikey
 layout:
   Medien:
   Netzwerk:
   Verwaltung:
+background:
+  image: /images/wallpaper.jpg
+  saturate: 100
+  brightness: 100
+  opacity: 100
+showStats: true
+color: teal

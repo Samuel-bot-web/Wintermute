@@ -1,0 +1,16 @@
+services:
+  kavita:
+    image: lscr.io/linuxserver/kavita:latest
+    container_name: kavita
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    volumes:
+      - /mnt/nas6tb/kavita/config:/config
+      - /mnt/nas6tb/kavita/books:/data
+    ports:
+      - "8030:5000"
+    restart: unless-stopped
