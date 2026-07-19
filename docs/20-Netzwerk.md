@@ -36,3 +36,8 @@ vmbr0 verschoben.
 Wichtig: SSH/Dropbear-Zugriff für LUKS-Unlock (70-Sicherheit.md) hängt
 jetzt an vmbr0 statt direkt an enp5s0. Bei künftigen Netzwerk-Debugging-
 Sessions daran denken.
+
+## VM101 Fritz-Box-Reservierung (12.07.2026)
+
+VM101 (Home Assistant OS, MAC BC:24:11:41:67:BA) fest auf
+192.168.178.38 reserviert.
