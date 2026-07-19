@@ -1091,3 +1091,41 @@ Lehre: Bei jedem Cron-gesteuerten Skript, das Systembefehle aus /sbin
 oder /usr/sbin nutzt (cryptsetup, mount als root, etc.), den PATH
 explizit im Skript setzen - sich nicht auf die interaktive Shell-
 Umgebung verlassen, in der getestet wurde.
+
+## Aktueller Stand (19.07.2026 - Kopia-Server TLS-Cert-Bugfix, Mount-Workflow)
+
+### Bugfix: kopia-server.service startete nach Neustart nicht mehr
+Nach dem manuellen Aus-/Einhaengen der Backup-Platte (um die Web-UI
+kurzzeitig zu nutzen) verweigerte der Dienst den Neustart mit
+"TLS cert file already exists". Ursache: die systemd-Unit enthielt
+--tls-generate-cert, das bei JEDEM Start versucht ein neues
+Zertifikat zu erzeugen - schlaegt fehl, sobald eines schon existiert
+(was nach dem ersten erfolgreichen Start immer der Fall ist).
+Fix: --tls-generate-cert aus /etc/systemd/system/kopia-server.service
+entfernt (Zertifikat existiert ja bereits unter /etc/kopia/kopia.cert
+und .key), danach daemon-reload + restart.
+
+### Entscheidung: Backup-Platte bleibt NICHT dauerhaft gemountet
+Nach Ueberlegung (Homepage-Button vs. dauerhaftes Mounten vs. manueller
+Befehl) hat sich der Nutzer bewusst fuer den manuellen Befehl
+entschieden - spart Strom (Festplatte muss nicht dauerhaft laufen),
+kein zusaetzlicher Dienst noetig gepflegt zu werden. Konsequenz: die
+Kopia-Web-UI zeigt "refresh error" / ist nicht nutzbar, wann immer die
+Platte nicht gemountet ist (z.B. ausserhalb des naechtlichen 3-Uhr-
+Backup-Fensters) - das ist erwartetes, akzeptiertes Verhalten, kein
+Fehler. Bei Bedarf (Restore, Snapshot-Browsing) manuell mounten:
+sudo cryptsetup luksOpen --key-file /etc/cryptsetup-keys.d/backup-4tb.key 
+/dev/disk/by-id/ata-WDC_WD40NDZW-11A8JS1_WD-WXU2E7032L5S backup4tb_crypt
+sudo mount /dev/mapper/backup4tb_crypt /mnt/backup4tb
+sudo systemctl restart kopia-server
+Danach wieder schliessen:
+sudo umount /mnt/backup4tb
+sudo cryptsetup luksClose backup4tb_crypt
+(Siehe auch docs/60-Backups.md, Abschnitt 1 und 4.)
+
+### Bestaetigt: PATH-Bugfix vom 19.07. erfolgreich
+Manueller Testlauf nach dem PATH-Fix lief komplett in 7 Minuten 27
+Sekunden durch (16:33:58 - 16:41:25 Uhr), im Vergleich zum
+urspruenglichen 19h-Erstlauf - Kopias Deduplizierung funktioniert wie
+erwartet. Home-Assistant-Uebertragung lief ebenfalls fehlerfrei (kein
+scp/SFTP-Fehler mehr).
