@@ -1129,3 +1129,52 @@ Sekunden durch (16:33:58 - 16:41:25 Uhr), im Vergleich zum
 urspruenglichen 19h-Erstlauf - Kopias Deduplizierung funktioniert wie
 erwartet. Home-Assistant-Uebertragung lief ebenfalls fehlerfrei (kein
 scp/SFTP-Fehler mehr).
+
+## CPU-Tausch: Skylake → Kaby Lake (i7-7700)
+
+**Datum:** 20.07.2026
+**Anlass:** Intel HD 530 (Skylake) konnte kein 10-bit-HEVC/HDR/Dolby-Vision
+hardwarebeschleunigt decodieren, was zu Jellyfin-Abstürzen bei HDR-Filmen
+führte. Kaby Lake (UHD 630, Gen9.5) unterstützt dies.
+
+**Ablauf:**
+1. BIOS auf Version F22g (Q-Flash) mit noch eingebauter i5-6600
+   aktualisiert, um Kaby-Lake-Support zu aktivieren
+2. CPU-Tausch: Intel Core i5-6600 → Intel Core i7-7700
+3. Nach dem BIOS-Update (noch mit alter CPU) verschob sich die PCI-
+   Enumeration: Netzwerk-Interface wechselte von enp5s0 zu enp6s0.
+   Betroffen waren zwei Stellen:
+   - /etc/network/interfaces (iface/bridge-ports-Einträge)
+   - /etc/initramfs-tools/initramfs.conf (IP=... Zeile für Dropbear/
+     LUKS-Remote-Unlock)
+   Beide per sed korrigiert, anschließend `update-initramfs -u -k all`
+   (erfordert gemountete /boot-Partition, sonst stiller Fehlschlag ohne
+   Wirkung). Hinweis für künftige BIOS-Updates: gleiches Muster erwarten,
+   ggf. auf udev-basierte .link-Regeln mit fester MAC-Adresse umstellen,
+   um Interface-Namen unabhängig von PCI-Reihenfolge zu machen.
+4. GPU-Passthrough-Konfiguration geprüft:
+   - PCI-Adresse 00:02.0 unverändert
+   - Geräte-ID geändert von 8086:1912 (Skylake HD 530) zu 8086:5912
+     (Kaby Lake UHD 630)
+   - /etc/modprobe.d/vfio.conf entsprechend angepasst (sed), danach
+     erneut update-initramfs -u -k all
+5. VM100 neu gestartet (qm start 100, da qm reboot am fehlenden
+   QEMU Guest Agent scheiterte), GPU-Sichtbarkeit in VM100 bestätigt:
+   Kaby Lake UHD 630 unter i915-Treiber sichtbar (lspci -nnk)
+6. Jellyfin: HEVC- und HEVC-10bit-Hardwaredekodierung waren bereits
+   aktiviert (Dashboard → Playback → Transcoding, QSV-Gerät
+   /dev/dri/renderD128)
+7. Verifiziert mit HDR-Testfilm: Wiedergabe läuft stabil ohne Absturz
+
+**Ergebnis:** HDR/Dolby-Vision-Wiedergabe funktioniert jetzt über
+Hardware-Transkodierung (Intel QuickSync, UHD 630). CPU zusätzlich von
+4 auf 8 Threads aufgerüstet (Hyperthreading), behebt auch die zuvor in
+10-Hardware.md vermerkte Thread-Limitierung bei paralleler Dienstlast.
+
+**Lessons Learned:** BIOS-Updates auf diesem Board können die PCI-
+Enumeration verschieben und damit vorhersagbare Netzwerk-Interface-
+Namen (enpXsY) ändern. Betrifft sowohl das laufende System als auch
+das initramfs/Dropbear-Setup für Remote-LUKS-Unlock. Beim nächsten
+BIOS- oder Hardware-Update: zuerst mit Tastatur+Monitor lokal am
+Server arbeiten (nicht ausschließlich auf SSH verlassen), da genau
+dieser Fall SSH-Zugriff temporär unmöglich machen kann.
