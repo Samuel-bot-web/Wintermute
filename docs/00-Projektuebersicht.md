@@ -1178,3 +1178,29 @@ das initramfs/Dropbear-Setup für Remote-LUKS-Unlock. Beim nächsten
 BIOS- oder Hardware-Update: zuerst mit Tastatur+Monitor lokal am
 Server arbeiten (nicht ausschließlich auf SSH verlassen), da genau
 dieser Fall SSH-Zugriff temporär unmöglich machen kann.
+### Nachtrag: Docker-Berechtigungsprobleme nach hartem VM100-Neustart (Redis)
+Nach dem harten Stop/Start von VM100 zeigten Nextcloud und Kavita
+Fehler: Nextcloud "config-Verzeichnis nicht schreibbar", Kavita
+"SQLite Error 8: attempt to write a readonly database". Ursache:
+Ordner auf dem virtiofs-Share /mnt/nas6tb (nextcloud/html,
+nextcloud/data, kavita/config, kavita/books) hatten UID:GID 100:101
+statt der von den Containern erwarteten IDs (Nextcloud: 33:33, Kavita:
+1000:1000 laut PUID/PGID-Env). Fix: sudo chown -R 33:33
+/mnt/nas6tb/nextcloud/html /mnt/nas6tb/nextcloud/data && sudo chown -R
+1000:1000 /mnt/nas6tb/kavita/config /mnt/nas6tb/kavita/books && docker
+restart nextcloud kavita.
+Zusatzfund: Auch nextcloud-redis (/mnt/nas6tb/nextcloud/redisdata)
+hatte 100:101 statt der von Redis erwarteten 999:999. Redis konnte
+dadurch keine RDB-Snapshots mehr schreiben ("Permission denied"),
+ging in einen MISCONF-Zustand und blockierte alle schreibenden
+Befehle - das riss Nextcloud erneut auf 503 runter, obwohl Apache
+selbst normal lief und der config-Fix bereits angewendet war.
+Erkennbar an "Failed opening the temp RDB file ... Permission denied"
+in docker logs nextcloud-redis. Fix: sudo chown -R 999:999
+/mnt/nas6tb/nextcloud/redisdata && docker restart nextcloud-redis
+nextcloud. paperless-broker (ebenfalls Redis, gleicher Mount-Bereich)
+war nicht betroffen und lief unauffaellig weiter.
+Lehre: Nach jedem harten VM-Neustart die UID/GID auf allen
+Docker-Volume-Mounts unter /mnt/nas6tb pruefen (ls -lan), bevor man
+einzelne Container einzeln durchgeht - betraf hier gleich vier
+verschiedene Verzeichnisse mit derselben falschen 100:101-Zuordnung.
