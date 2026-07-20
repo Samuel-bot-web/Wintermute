@@ -4,8 +4,8 @@ Stand: 18.07.2026
 
 ## System
 - **Mainboard:** Gigabyte Z170-HD3P-CF
-- **CPU:** Intel Core i5-6600 @ 3.30GHz (4 Kerne, 1 Thread/Kern, kein
-  Hyperthreading)
+- **CPU:** Intel Core i7-7700 @ 3.60GHz (4 Kerne, 2 Threads/Kern,
+  Hyperthreading, 8 Threads insgesamt)
 - **GPU (integriert, kein Passthrough eingerichtet):** Intel HD
   Graphics 530
 - **Netzwerk:** Realtek RTL8111/8168/8211/8411 PCIe Gigabit Ethernet
