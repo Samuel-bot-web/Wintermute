@@ -41,6 +41,13 @@
         server: my-docker
         container: kavita
 
+    - Audiobookshelf:
+        href: http://192.168.178.36:13378/
+        description: Hörbücher & Podcasts
+        icon: audiobookshelf.png
+        server: my-docker
+        container: audiobookshelf
+
 - Dokumente & Cloud:
     - Paperless-ngx:
         href: http://192.168.178.36:8010/

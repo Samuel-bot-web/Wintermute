@@ -1204,3 +1204,73 @@ Lehre: Nach jedem harten VM-Neustart die UID/GID auf allen
 Docker-Volume-Mounts unter /mnt/nas6tb pruefen (ls -lan), bevor man
 einzelne Container einzeln durchgeht - betraf hier gleich vier
 verschiedene Verzeichnisse mit derselben falschen 100:101-Zuordnung.
+## Aktueller Stand (29.07.2026 - Home Assistant öffentlich erreichbar)
+
+### Vollständig abgeschlossen
+- Home Assistant öffentlich erreichbar gemacht (analog zu Paperless/Nextcloud/
+  Immich, gleiche Infrastruktur):
+  - Proxy Host in Nginx Proxy Manager: ha.brueggemann.site ->
+    192.168.178.38:8123 (VM101, kein Docker-Container), Websockets Support
+    aktiviert (notwendig für Live-Updates in der HA-Oberfläche)
+  - Published Application Route in Cloudflare Tunnel: ha.brueggemann.site ->
+    192.168.178.36:80 (zeigt auf NPMs Proxy-Port, analog zu den anderen
+    Diensten)
+  - Home Assistant configuration.yaml ergänzt:
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 192.168.178.36
+  - Home Assistant URL (Einstellungen -> System -> Netzwerk) auf
+    https://ha.brueggemann.site gesetzt, lokales Netzwerk bleibt auf
+    "Automatisch" (weiterhin schneller interner Zugriff im Heimnetz)
+  - Öffentlicher Zugriff erfolgreich getestet (Mobilfunknetz)
+- Studio Code Server Add-on in Home Assistant installiert (für die
+  Bearbeitung der configuration.yaml)
+- Home-Assistant-API-Token erneuert: alter Long-Lived Access Token (der
+  einmalig im Chat-Verlauf geteilt worden war) in Home Assistant widerrufen,
+  neuer Token direkt in stacks/homepage/.env auf VM100 eingetragen (nicht
+  mehr im Chat geteilt), Homepage-Container neu gestartet
+
+### Wichtige Lehre: trusted_proxies bei Diensten auf einer anderen VM
+Bei Nextcloud (Docker-Container im selben Docker-Netzwerk wie NPM) war die
+korrekte trusted_proxies-IP die Docker-Netzwerk-Gateway-IP (172.26.0.1). Bei
+Home Assistant, das nativ auf VM101 läuft (andere VM, kein gemeinsames
+Docker-Netzwerk mit NPM), kommt die Anfrage stattdessen von der realen
+LAN-IP des NPM-Hosts (192.168.178.36) an - Docker übersetzt die
+Absender-IP beim Verlassen des Docker-Netzwerks auf die Host-IP. Führte
+zunächst zu "400 Bad Request" von Home Assistant. Lehre: bei
+Reverse-Proxy-Zielen auf einer anderen VM als NPM selbst die LAN-IP des
+NPM-Hosts (nicht die Docker-Gateway-IP) in trusted_proxies eintragen.
+
+### Nebenbefund: Supervisor hing kurzzeitig im Setup-Zustand
+Während der Studio-Code-Server-Installation blieb der Add-on-Installer
+scheinbar endlos hängen. Ursache: ein zwischenzeitlicher
+"ha supervisor restart" brachte den Supervisor in den Zustand "setup",
+in dem er ungewöhnlich lange verblieb (ha info / ha resolution info
+schlugen in dieser Zeit mit "System is not ready" fehl). Home Assistant
+Core selbst lief währenddessen unbeeinträchtigt weiter (Dashboard normal
+erreichbar). Problem löste sich nach einigen Minuten von selbst, kein
+manueller Eingriff nötig. Falls erneut: erst pruefen, ob Core (Port 8123)
+noch reagiert, bevor an der VM selbst etwas geändert wird.
+
+### Bekannte offene Probleme (bewusst zurückgestellt)
+- 2FA für den Home-Assistant-Account noch nicht bestätigt eingerichtet -
+  sollte angesichts der jetzt öffentlichen Erreichbarkeit zeitnah erfolgen
+- Cloudflare WAF weiterhin nicht eingerichtet (bereits bei Nextcloud als
+  Idee notiert) - bei Home Assistant (steuert ggf. physische Geräte)
+  zunehmend sinnvoll
+- Unverändert bestehende offene Punkte: QEMU Guest Agent auf VM100,
+  Home-Assistant-Live-Status-Widget in Homepage weiterhin 401
+  (Upstream-Bug gethomepage/homepage #5074)
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. 2FA für Home-Assistant-Account einrichten/verifizieren
+2. Cloudflare WAF vor Home Assistant (und ggf. Nextcloud) einrichten
+3. QEMU Guest Agent in VM100 installieren
+
+### Zugriff / Referenzen (Ergänzung)
+- Home Assistant (öffentlich): https://ha.brueggemann.site
+- Home Assistant (lokal): http://192.168.178.38:8123
+- Alle öffentlichen Dienste im Überblick: Paperless (paperless.),
+  Nextcloud (cloud.), Immich (photos.), Home Assistant (ha.) -
+  jeweils .brueggemann.site
