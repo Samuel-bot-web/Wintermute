@@ -48,6 +48,13 @@
         server: my-docker
         container: audiobookshelf
 
+    - RomM:
+        href: http://192.168.178.36:8040/
+        description: ROM-Manager
+        icon: romm.png
+        server: my-docker
+        container: romm
+
 - Dokumente & Cloud:
     - Paperless-ngx:
         href: http://192.168.178.36:8010/
@@ -103,3 +110,24 @@
         href: http://192.168.178.38:8123/
         description: Smart Home Steuerung
         icon: home-assistant.png
+
+- Speicher:
+    - Backup-Platte:
+        description: Letzter bekannter Stand (nur beim nächtlichen Backup online)
+        widget:
+          type: customapi
+          url: http://192.168.178.37:8091/backup-status.json
+          refreshInterval: 300000
+          mappings:
+            - field: percent
+              label: Belegt
+              format: text
+            - field: used
+              label: Benutzt
+              format: text
+            - field: avail
+              label: Frei
+              format: text
+            - field: updated
+              label: Stand
+              format: text

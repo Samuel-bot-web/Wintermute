@@ -1,0 +1,14 @@
+[Unit]
+Description=Statischer Webserver fuer Backup-Platten-Status (nur LAN)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/backup-status
+ExecStart=/usr/bin/python3 -m http.server 8091 --bind 192.168.178.37
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+

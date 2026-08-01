@@ -24,3 +24,4 @@ volumes/
 .env
 stacks/adguard/conf/AdGuardHome.yaml
 **/.env
+nohup.out
