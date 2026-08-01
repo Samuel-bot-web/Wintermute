@@ -41,3 +41,37 @@ Sessions daran denken.
 
 VM101 (Home Assistant OS, MAC BC:24:11:41:67:BA) fest auf
 192.168.178.38 reserviert.
+
+
+## Port-Belegung VM100 (Stand 01.08.2026)
+
+Bestandsaufnahme per `sudo ss -tulpn | grep LISTEN`. Vor der Vergabe
+eines neuen Ports für einen Dienst hier nachsehen bzw. die Tabelle
+danach ergänzen.
+
+| Port  | Dienst                          | Bemerkung                          |
+|-------|----------------------------------|-------------------------------------|
+| 22    | SSH                              |                                      |
+| 53    | AdGuard Home                     | DNS                                  |
+| 80    | Nginx Proxy Manager               | Proxy-Traffic (HTTP)                |
+| 81    | Nginx Proxy Manager               | Admin-UI                            |
+| 139   | Samba                             | NetBIOS                             |
+| 443   | Nginx Proxy Manager               | Proxy-Traffic (HTTPS)               |
+| 445   | Samba                             | SMB                                  |
+| 2283  | Immich                            |                                      |
+| 3000  | AdGuard Home                      | Web-UI (von Port 80 hierher verlegt)|
+| 3001  | Homepage-Dashboard                |                                      |
+| 3002  | ? – zu klären                     |                                      |
+| 8010  | Paperless-ngx                     |                                      |
+| 8020  | Nextcloud                         |                                      |
+| 8030  | Kavita                            |                                      |
+| 8040  | RomM                              | neu, 01.08.2026                     |
+| 8080  | ? – zu klären                     |                                      |
+| 8082  | ? – zu klären                     |                                      |
+| 8096  | Jellyfin                          |                                      |
+| 9000  | Portainer                         | vermutlich Edge-Agent-Port          |
+| 9443  | Portainer                         | Web-UI (HTTPS)                      |
+| 13378 | ? – zu klären                     | Default-Port von Audiobookshelf, falls sowas läuft |
+| 61208 | Glances                           |                                      |
+
+**Nächster freier Port in der 80xx-Reihe:** 8050
