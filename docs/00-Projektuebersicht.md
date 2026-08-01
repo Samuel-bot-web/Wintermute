@@ -1274,3 +1274,14 @@ noch reagiert, bevor an der VM selbst etwas geändert wird.
 - Alle öffentlichen Dienste im Überblick: Paperless (paperless.),
   Nextcloud (cloud.), Immich (photos.), Home Assistant (ha.) -
   jeweils .brueggemann.site
+
+## VM100-Systemdisk erweitert (01.08.2026)
+
+VM100-Systemdisk von 64GB auf 128GB erweitert (analog zum Vorgehen
+vom 17.07.), da durch RomM, TREK, HortusFox und Gramps Web (inkl.
+mehrerer MariaDB-Instanzen und Docker-Images) die Belegung auf 95%
+gestiegen war (nur noch 3,4GB frei). Ablauf: `qm resize 100 scsi0
++64G` auf dem Host, danach `growpart /dev/sda 2` + `resize2fs
+/dev/sda2` in der VM. Neuer Stand: 125GB gesamt, 64GB frei (47%).
+Thin-Pool lokal-lvm hat weiterhin ~109GB Reserve für künftiges
+Wachstum.
