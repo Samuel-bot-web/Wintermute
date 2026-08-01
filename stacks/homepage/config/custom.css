@@ -1,13 +1,23 @@
 /* Kartenhintergrund weiß statt dunkel, plus Mattglas-Blur */
 .service-card {
-  background-color: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(8px) !important;
+  background-color: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
 }
 
-/* Schrift innerhalb der Karten dunkel, damit sie auf Weiß lesbar bleibt */
+/* Standardtext innerhalb der Karte dunkel, damit er auf Weiß lesbar bleibt */
 .service-card,
 .service-card * {
   color: #18181b !important;
+}
+
+/* Stat-Boxen (CPU, MEM, RX, TX etc.) hell/weiß statt dunkel-transparent */
+.service-block {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Anwendungsname: dynamische Theme-Akzentfarbe (wie "Medien"/"Netzwerk") statt Standard-Dunkel */
+.service-title {
+  color: rgb(var(--color-300) / 1) !important;
 }
 
 /* Status-Badges (RUNNING/HEALTHY/EXITED etc.) ihre ursprüngliche Farbe zurückgeben */
@@ -37,4 +47,8 @@
 }
 .docker-status-starting {
   background-color: rgba(2, 132, 199, 0.18) !important;
+}
+/* Stat-Boxen (CPU, MEM, RX, TX etc.) hell/weiß statt dunkel-transparent */
+.service-block {
+  background-color: rgba(255, 255, 255, 0.6) !important;
 }
