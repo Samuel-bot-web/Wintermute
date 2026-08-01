@@ -131,3 +131,22 @@
             - field: updated
               label: Stand
               format: text
+- Reise & Hobby:
+    - TREK:
+        href: http://192.168.178.36:8050/
+        description: Reise-Planer
+        icon: trek.png
+        server: my-docker
+        container: trek
+    - HortusFox:
+        href: http://192.168.178.36:8060/
+        description: Pflanzenverwaltung
+        icon: hortusfox.png
+        server: my-docker
+        container: hortusfox
+    - Gramps Web:
+        href: http://192.168.178.36:8070/
+        description: Ahnenforschung
+        icon: gramps.png
+        server: my-docker
+        container: grampsweb

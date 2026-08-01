@@ -73,5 +73,7 @@ danach ergänzen.
 | 9443  | Portainer                         | Web-UI (HTTPS)                      |
 | 13378 | ? – zu klären                     | Default-Port von Audiobookshelf, falls sowas läuft |
 | 61208 | Glances                           |                                      |
+| 8050  | TREK                              | Reise-Planer                        |
+| 8060  | HortusFox                         | Pflanzenverwaltung                  |
+| 8070  | Gramps Web                        | Ahnenforschung                      |
 
-**Nächster freier Port in der 80xx-Reihe:** 8050

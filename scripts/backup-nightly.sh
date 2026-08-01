@@ -60,6 +60,7 @@ mkdir -p "$BACKUP_MOUNT/db-dumps"
 ssh -i "$SSH_KEY" "$VM100_HOST" "docker exec paperless-db pg_dump -U paperless paperless" > "$BACKUP_MOUNT/db-dumps/paperless-$(date +%Y%m%d).sql" 2>>"$LOG_FILE"
 ssh -i "$SSH_KEY" "$VM100_HOST" "docker exec nextcloud-db pg_dump -U nextcloud nextcloud" > "$BACKUP_MOUNT/db-dumps/nextcloud-$(date +%Y%m%d).sql" 2>>"$LOG_FILE"
 ssh -i "$SSH_KEY" "$VM100_HOST" "docker exec romm-db sh -c 'exec mariadb-dump -uroot -p\"\$MARIADB_ROOT_PASSWORD\" romm'" > "$BACKUP_MOUNT/db-dumps/romm-$(date +%Y%m%d).sql" 2>>"$LOG_FILE"
+ssh -i "$SSH_KEY" "$VM100_HOST" "docker exec hortusfox-db sh -c 'exec mariadb-dump -uroot -p\"\$MARIADB_ROOT_PASSWORD\" hortusfox'" > "$BACKUP_MOUNT/db-dumps/hortusfox-$(date +%Y%m%d).sql" 2>>"$LOG_FILE"
 
 # Alte Dumps aufräumen (nur die letzten 7 Tage behalten, Kopia sichert die Historie ohnehin)
 find "$BACKUP_MOUNT/db-dumps" -name "*.sql" -mtime +7 -delete
@@ -81,7 +82,9 @@ kopia snapshot create /mnt/nas6tb/romm --tags="service:romm" >> "$LOG_FILE" 2>&1
 kopia snapshot create "$BACKUP_MOUNT/db-dumps" --tags="service:db-dumps" >> "$LOG_FILE" 2>&1
 kopia snapshot create "$STAGING/homeserver" --tags="service:configs" >> "$LOG_FILE" 2>&1
 kopia snapshot create /mnt/nas6tb/audiobookshelf --tags="service:audiobookshelf" >> "$LOG_FILE" 2>&1 || true
-
+kopia snapshot create /mnt/nas6tb/trek --tags="service:trek" >> "$LOG_FILE" 2>&1
+kopia snapshot create /mnt/nas6tb/hortusfox --tags="service:hortusfox" >> "$LOG_FILE" 2>&1
+kopia snapshot create /mnt/nas6tb/grampsweb --tags="service:grampsweb" >> "$LOG_FILE" 2>&1
 
 # Immich nur sichern, falls der Ordner existiert und der Dienst wieder aktiv ist
 if [ -d /mnt/nas6tb/immich ]; then

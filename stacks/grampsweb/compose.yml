@@ -1,0 +1,37 @@
+services:
+  grampsweb: &grampsweb
+    image: ghcr.io/gramps-project/grampsweb:latest
+    container_name: grampsweb
+    restart: unless-stopped
+    ports:
+      - "8070:5000"
+    environment:
+      GRAMPSWEB_TREE: ${GRAMPSWEB_TREE}
+      GRAMPSWEB_CELERY_CONFIG__broker_url: "redis://grampsweb-redis:6379/0"
+      GRAMPSWEB_CELERY_CONFIG__result_backend: "redis://grampsweb-redis:6379/0"
+      GRAMPSWEB_RATELIMIT_STORAGE_URI: redis://grampsweb-redis:6379/1
+    depends_on:
+      - grampsweb-redis
+    volumes:
+      - /mnt/nas6tb/grampsweb/users:/app/users
+      - /mnt/nas6tb/grampsweb/index:/app/indexdir
+      - /mnt/nas6tb/grampsweb/thumb_cache:/app/thumbnail_cache
+      - /mnt/nas6tb/grampsweb/cache:/app/cache
+      - /mnt/nas6tb/grampsweb/secret:/app/secret
+      - /mnt/nas6tb/grampsweb/db:/root/.gramps/grampsdb
+      - /mnt/nas6tb/grampsweb/media:/app/media
+      - /mnt/nas6tb/grampsweb/tmp:/tmp
+
+  grampsweb-celery:
+    <<: *grampsweb
+    ports: []
+    container_name: grampsweb-celery
+    depends_on:
+      - grampsweb
+      - grampsweb-redis
+    command: celery -A gramps_webapi.celery worker --loglevel=INFO --concurrency=2
+
+  grampsweb-redis:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: grampsweb-redis
+    restart: unless-stopped
