@@ -135,7 +135,7 @@
     - TREK:
         href: http://192.168.178.36:8050/
         description: Reise-Planer
-        icon: trek.png
+        icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/trek.svg
         server: my-docker
         container: trek
     - HortusFox:
