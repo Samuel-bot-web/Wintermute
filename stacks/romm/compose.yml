@@ -9,6 +9,9 @@ services:
       - DB_USER=romm-user
       - DB_PASSWD=${MARIADB_PASSWORD}
       - ROMM_AUTH_SECRET_KEY=${ROMM_AUTH_SECRET_KEY}
+      - SCREENSCRAPER_USER=${SCREENSCRAPER_USER}
+      - SCREENSCRAPER_PASSWORD=${SCREENSCRAPER_PASSWORD}
+      - HASHEOUS_API_ENABLED=true
     volumes:
       - /mnt/nas6tb/romm/library:/romm/library
       - /mnt/nas6tb/romm/resources:/romm/resources
