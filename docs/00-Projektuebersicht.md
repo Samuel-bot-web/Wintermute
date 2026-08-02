@@ -1285,3 +1285,79 @@ gestiegen war (nur noch 3,4GB frei). Ablauf: `qm resize 100 scsi0
 /dev/sda2` in der VM. Neuer Stand: 125GB gesamt, 64GB frei (47%).
 Thin-Pool lokal-lvm hat weiterhin ~109GB Reserve für künftiges
 Wachstum.
+
+## Aktueller Stand (02.08.2026 - Cloudflare-Haertung, Speicherlimits, Secret-Rotation)
+
+### Vollstaendig abgeschlossen
+- Cloudflare-Haertung eingerichtet (Free-Plan):
+  - Bot Fight Mode aktiviert
+  - Free Managed Ruleset (automatisch aktiv im Free-Plan, deckt u.a. die
+    Pfad-Traversal-Angriffsklasse ab, die am 17.07. bei Nextcloud
+    beobachtet wurde)
+  - 1 Rate-Limiting-Regel (Free-Plan-Limit): Hostname wildcard
+    *.brueggemann.site, 150 Requests/10 Sekunden, Aktion Block
+  - 1 Custom Rule: ha.brueggemann.site, Aktion Managed Challenge
+  - Hinweis: Security Level ist seit Maerz 2025 von Cloudflare automatisiert
+    (immer "Always protected"), kein manueller Regler mehr vorhanden
+  - Custom-Rule-Versuch mit Managed Challenge auf office.brueggemann.site
+    wieder entfernt: brach die Server-zu-Server-Kommunikation zwischen
+    Nextcloud und OnlyOffice (Challenge kann von Backend-Requests nicht
+    geloest werden) - Nextcloud fiel automatisch auf den eingebauten
+    Editor zurueck
+- OnlyOffice nachtraeglich als versionierter Compose-Stack angelegt
+  (stacks/onlyoffice/compose.yml): lief bisher als loser docker-run-
+  Container ausserhalb von Git (dadurch nie dokumentiert, Port 8082 war
+  entsprechend lange als "zu klaeren" markiert). JWT-Secret rotiert,
+  da der urspruengliche Wert einmalig im Chat sichtbar wurde
+- Speicherlimits ergaenzt (analog zum Nextcloud-Vorfall vom 17.07.):
+  - Paperless (webserver): 4G
+  - Immich (immich-server, immich-machine-learning): je 4G
+- Paperless: Secret Key, Admin-Passwort und Postgres-Passwort rotiert,
+  nachdem alle drei durch ein unbedachtes `docker compose config`
+  (loest ${VARIABLEN} im Klartext auf) im Chat sichtbar wurden
+- GitHub-Repo Samuel-bot-web/Wintermute auf public gestellt (vorher
+  Secret-Scan der Git-Historie durchgefuehrt: nur ${VARIABLEN}-Referenzen
+  gefunden, keine Klartext-Secrets in der Historie)
+
+### Vollstaendige Liste oeffentlich erreichbarer Dienste (Stand 02.08.2026)
+Alle ueber Cloudflare Tunnel + Nginx Proxy Manager, jeweils
+*.brueggemann.site:
+- paperless. -> Paperless-ngx
+- cloud. -> Nextcloud
+- office. -> OnlyOffice (Nextcloud-Companion)
+- photos. -> Immich
+- ha. -> Home Assistant (laeuft nativ auf VM101, nicht als Docker-
+  Container)
+- jellyfin. -> Jellyfin
+- kavita. -> Kavita
+- audiobookshelf. -> Audiobookshelf
+- trek. -> TREK
+- hortusfox. -> HortusFox
+- grampsweb. -> Gramps Web
+- uptime-kuma. -> Uptime Kuma (Absicherung/Exposure-Art noch nicht
+  geprueft, siehe offene Punkte)
+
+Nicht (mehr) oeffentlich: interne Verwaltungsoberflaechen (NPM Port 81,
+Portainer, Paperless-/Nextcloud-Admin-Bereiche laufen ueber die
+regulaeren Logins der jeweiligen Dienste, keine separate Admin-Route).
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Uptime Kuma: noch nicht geprueft, ob hinter der oeffentlichen Route
+  eine dedizierte Status-Page oder das volle Admin-Dashboard mit Login
+  liegt
+- Home-Assistant-VM (VM101): laeuft nativ, kein Docker-Speicherlimit
+  moeglich - RAM-Begrenzung muesste stattdessen auf Proxmox-VM-Ebene
+  erfolgen, noch nicht umgesetzt
+- 2FA fuer den Home-Assistant-Account weiterhin nicht bestaetigt
+  eingerichtet (bereits am 29.07. als offen vermerkt)
+- Rate-Limiting-Schwelle (150/10s) ist ein Kompromiss aus dem Free-Plan-
+  Limit von nur einer Regel fuer die gesamte Domain - grosszuegig genug
+  fuer Nextcloud/OnlyOffice-Lastspitzen, aber entsprechend grobmaschiger
+  gegen Scanner als eine dienst-spezifische Regel es waere
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Uptime Kuma Exposition pruefen, ggf. absichern oder auf intern
+   zurueckstellen
+2. RAM-Limit fuer VM101 (Home Assistant) in Proxmox pruefen/setzen
+3. 2FA fuer Home-Assistant-Account einrichten
+
