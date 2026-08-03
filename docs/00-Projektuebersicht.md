@@ -1361,3 +1361,19 @@ regulaeren Logins der jeweiligen Dienste, keine separate Admin-Route).
 2. RAM-Limit fuer VM101 (Home Assistant) in Proxmox pruefen/setzen
 3. 2FA fuer Home-Assistant-Account einrichten
 
+
+## Aktueller Stand (02.08.2026, Nachtrag - 2FA Home Assistant)
+
+### Vollstaendig abgeschlossen
+- 2FA fuer den Home-Assistant-Account eingerichtet (TOTP via Aegis
+  Authenticator, offline/lokal auf Android-Geraet, keine Cloud-
+  Abhaengigkeit). Backup-Codes im Passwort-Manager gesichert.
+- Uptime Kuma geprueft: oeffentliche Route zeigt eine Login-Maske,
+  kein ungeschuetztes Admin-Dashboard - keine weitere Massnahme noetig.
+
+Damit ist der am 02.08. begonnene Haertungs-Durchgang
+(Cloudflare, Speicherlimits, Secret-Rotation, 2FA) abgeschlossen.
+Einzig zurueckgestellter Punkt: RAM-Limit fuer VM101 (Home Assistant)
+auf Proxmox-Ebene - bewusst nicht umgesetzt, da bisher nie
+Probleme aufgetreten sind.
+
