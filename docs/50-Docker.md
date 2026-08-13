@@ -52,3 +52,15 @@ docker compose up -d --force-recreate
 Beide liefen nach Wiederherstellung der Backups (jellyfin-config.tar.gz,
 portainer-data.tar.gz) direkt sauber mit den ursprünglichen Daten hoch,
 kein manueller Eingriff nötig.
+
+### media-automation
+- Zweck: Automatisierte Mediensuche/-beschaffung über Usenet (Radarr,
+  Sonarr, Prowlarr, NZBGet), Anfrage-Portal für Freunde (Jellyseerr)
+- Konfiguration: stacks/media-automation/compose.yml, .env (WireGuard-
+  Key, NZBGet-Login - nicht im Git-Repo)
+- Netzwerk-Besonderheit: alle Container außer gluetun selbst nutzen
+  network_mode: "service:gluetun" - kein eigenes Docker-Netzwerk,
+  Erreichbarkeit untereinander per "localhost"
+- Daten: Configs auf 6-TB-Platte (/mnt/nas6tb/media-automation/...),
+  Mediendateien direkt auf 4-TB-Platte (/mnt/media/Plex/...)
+- Watchtower: NICHT aktiviert (kein Backup-Konzept für diesen Stack)

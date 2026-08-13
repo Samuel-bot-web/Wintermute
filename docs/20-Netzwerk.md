@@ -76,4 +76,8 @@ danach ergänzen.
 | 8050  | TREK                              | Reise-Planer                        |
 | 8060  | HortusFox                         | Pflanzenverwaltung                  |
 | 8070  | Gramps Web                        | Ahnenforschung                      |
-
+| 5055  | Jellyseerr                        |                                      |
+| 6789  | NZBGet                             |                                      |
+| 7878  | Radarr                            |                                      |
+| 8989  | Sonarr                            |                                      |
+| 9696  | Prowlarr                          |                                      |

@@ -1377,3 +1377,101 @@ Einzig zurueckgestellter Punkt: RAM-Limit fuer VM101 (Home Assistant)
 auf Proxmox-Ebene - bewusst nicht umgesetzt, da bisher nie
 Probleme aufgetreten sind.
 
+## Aktueller Stand (13.08.2026 - Media-Automation eingerichtet, öffentlich erreichbar)
+
+### Vollständig abgeschlossen
+- IVPN als zentraler VPN-Ausgang eingerichtet (stacks/media-automation/,
+  Image qmcgaw/gluetun): WireGuard-Verbindung zu IVPN-Server de2.wg.ivpn.net,
+  bestätigt per öffentlichem IP-Check (37.58.60.153, Frankfurt) - identisch
+  bei gluetun und allen angehängten Containern (docker exec radarr wget
+  -qO- ifconfig.me lieferte dieselbe IP)
+- Radarr, Sonarr, Prowlarr, NZBGet, Jellyseerr eingerichtet, alle über
+  network_mode: "service:gluetun" hinter dem VPN-Tunnel (kein eigenes
+  Docker-Netzwerk, daher untereinander per "localhost" statt Container-
+  Namen erreichbar - wichtige Abweichung von den übrigen Stacks)
+- Usenet-Zugang und Indexer eingerichtet, NZBGet-Standardlogin (bekannt,
+  unsicher: nzbget/tegbzn6789) sofort auf eigenes Login geändert
+  (Settings -> Security)
+- NZBGet-Kategorien "tv" und "movies" angelegt (Settings -> Categories),
+  notwendig da Radarr/Sonarr sonst keine gültige Kategorie zuweisen
+  konnten
+- Root-Ordner gesetzt: /media/Plex/Movies (Radarr), /media/Plex/TV Shows
+  (Sonarr) - Pfade entsprechen /mnt/media/Plex/... auf dem Host, im
+  Container unter /media eingehängt. Berechtigungen mit chown 1000:1000
+  korrigiert (Ordner waren nicht vom PUID/PGID des linuxserver-Images
+  beschreibbar - vermutlich Windows/NTFS-Migrationsrelikt, analog zur
+  Lehre vom 20.07.)
+- Jellyseerr mit Jellyfin (LAN-IP, eigenes Docker-Netzwerk) sowie Radarr/
+  Sonarr (localhost, gemeinsamer Gluetun-Netzwerk-Stack) verknüpft
+- Erster Downloadtest erfolgreich: Suche -> NZBGet-Download -> Datei landet
+  korrekt in /mnt/media/Plex/... -> von Jellyfin erkannt
+- Jellyseerr öffentlich erreichbar gemacht (analog zu Paperless/Nextcloud/
+  Immich/Home Assistant, gleiche Infrastruktur):
+  - Proxy Host in Nginx Proxy Manager: requests.brueggemann.site ->
+    192.168.178.36:5055, Websockets Support aktiviert
+  - Published Application Route in Cloudflare Tunnel:
+    requests.brueggemann.site -> 192.168.178.36:80
+  - Öffentlicher Zugriff getestet
+- Homepage aktualisiert: neue Kategorie "Medien-Automatisierung" mit allen
+  fünf Diensten (Radarr, Sonarr, Prowlarr, NZBGet, Jellyseerr), inkl. Icons
+  und funktionierenden Live-Widgets (Warteschlange/Status)
+
+### Wichtige Lehre: env_file für Homepage-Widget-Secrets
+API-Keys/Passwörter für Homepage-Widgets zunächst direkt im Klartext in
+services.yaml eingetragen (funktionierte), dann auf Umgebungsvariablen-
+Syntax {{HOMEPAGE_VAR_NAME}} mit separater .env umgestellt (Vorbild:
+Watchtower-Token-Auslagerung vom 12.07.) - das schlug zunächst fehl, alle
+Widgets zeigten "API Error Information". Ursache: eine .env im selben
+Ordner wie compose.yml wird von Docker Compose nur zum Auflösen von
+${VARIABLEN} INNERHALB der compose.yml selbst genutzt, nicht automatisch
+als Umgebungsvariable in den Container hineingereicht. Fix: env_file: -
+.env explizit beim homepage-Service in compose.yml ergänzt, danach
+docker compose up -d (nicht nur restart, da sich die Container-
+Konfiguration geändert hatte). Verifiziert mit docker exec homepage env
+| grep HOMEPAGE_VAR.
+Lehre: Bei jedem Dienst, der Secrets per {{VARIABLE}}-Syntax aus einer
+.env lesen soll, prüfen ob env_file oder environment: im jeweiligen
+compose.yml-Service gesetzt ist - eine .env im selben Verzeichnis wird
+NICHT automatisch in den Container durchgereicht.
+
+### Bekannte offene Probleme (bewusst zurückgestellt)
+- Watchtower-Label bewusst NICHT gesetzt (analog Paperless/Nextcloud/
+  Immich) - kein Backup-Konzept für media-automation-Configs vorhanden
+- Kein Speicherlimit für die neuen Container gesetzt - bei Bedarf analog
+  zum Nextcloud-Vorfall vom 17.07. nachholen
+- media-automation-Stack ist noch NICHT im nächtlichen Backup-Skript
+  explizit berücksichtigt (nur /mnt/nas6tb/{paperless,nextcloud,kavita,
+  immich} einzeln gelistet) - Configs liegen aber unter ~/homeserver und
+  werden daher über den bestehenden rsync des kompletten homeserver-
+  Verzeichnisses ohnehin mitgesichert
+- 4-TB-Platte (/mnt/media) war bereits vor diesem Ausbau zu 99% voll
+  (~69 GB frei) - durch automatisierte Downloads jetzt akut im Blick zu
+  behalten
+- Swap-Nutzung bei 93% beobachtet (Stand 13.08., vor RAM-Erweiterung) -
+  fünf zusätzliche Container erhöhen den Speicherdruck auf ohnehin schon
+  knappen 16 GB RAM weiter, RAM-Modul-Einbau (siehe Eintrag 17.07.)
+  entsprechend dringlicher
+- Cloudflare-Rate-Limiting (bestehende Regel, 150 Req/10s für
+  *.brueggemann.site) deckt jetzt auch requests.brueggemann.site ab,
+  keine dienstspezifische Regel eingerichtet (Free-Plan-Limit von nur
+  einer Regel für die gesamte Domain, wie bereits am 02.08. dokumentiert)
+
+### Nächste Schritte (Ziel der kommenden Session)
+1. Speicherplatz auf /mnt/media prüfen/aufräumen, bevor automatisierte
+   Downloads das Problem verschärfen
+2. RAM-Module einbauen (weiterhin ausstehend seit 17.07.), angesichts
+   der jetzt höheren Swap-Nutzung dringlicher geworden
+3. Ggf. Speicherlimits für die fünf neuen Container ergänzen
+4. Media-Automation-Configs explizit ins Backup-Skript aufnehmen (auch
+   wenn bereits indirekt über den homeserver-rsync gesichert)
+
+### Zugriff / Referenzen (Ergänzung)
+- Radarr (lokal): http://192.168.178.36:7878
+- Sonarr (lokal): http://192.168.178.36:8989
+- Prowlarr (lokal): http://192.168.178.36:9696
+- NZBGet (lokal): http://192.168.178.36:6789 (Login: samuel, Passwort in
+  stacks/media-automation/.env)
+- Jellyseerr (lokal): http://192.168.178.36:5055
+- Jellyseerr (öffentlich): https://requests.brueggemann.site
+- Alle öffentlichen Dienste im Überblick (Ergänzung zur Liste vom
+  02.08.): ... requests. -> Jellyseerr (neu)
