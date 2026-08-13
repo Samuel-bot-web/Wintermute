@@ -150,3 +150,50 @@
         icon: gramps.png
         server: my-docker
         container: grampsweb
+
+- Karibik:
+    - Radarr:
+        href: http://192.168.178.36:7878
+        description: Filme suchen
+        icon: radarr.png
+        widget:
+          type: radarr
+          url: http://192.168.178.36:7878
+          key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
+
+    - Sonarr:
+        href: http://192.168.178.36:8989
+        description: Serien suchen
+        icon: sonarr.png
+        widget:
+          type: sonarr
+          url: http://192.168.178.36:8989
+          key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
+
+    - Prowlarr:
+        href: http://192.168.178.36:9696
+        description: Indexer-Verwaltung
+        icon: prowlarr.png
+        widget:
+          type: prowlarr
+          url: http://192.168.178.36:9696
+          key: "{{HOMEPAGE_VAR_PROWLARR_KEY}}"
+
+    - NZBGet:
+        href: http://192.168.178.36:6789
+        description: Download-Client
+        icon: nzbget.png
+        widget:
+          type: nzbget
+          url: http://192.168.178.36:6789
+          username: samuel
+          password: "{{HOMEPAGE_VAR_NZBGET_PASSWORD}}"
+
+    - Jellyseerr:
+        href: http://192.168.178.36:5055
+        description: Anfragen für Filme & Serien
+        icon: jellyseerr.png
+        widget:
+          type: jellyseerr
+          url: http://192.168.178.36:5055
+          key: "{{HOMEPAGE_VAR_JELLYSEERR_KEY}}"
