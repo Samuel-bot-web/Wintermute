@@ -1475,3 +1475,144 @@ NICHT automatisch in den Container durchgereicht.
 - Jellyseerr (öffentlich): https://requests.brueggemann.site
 - Alle öffentlichen Dienste im Überblick (Ergänzung zur Liste vom
   02.08.): ... requests. -> Jellyseerr (neu)
+## Aktueller Stand (17.08.2026 - virtiofsd File-Handle-Erschoepfung gefunden und behoben, RAM-Upgrade)
+
+### Vollstaendig abgeschlossen: RAM-Aufruestung
+- RAM-Module (2x 8GB DDR4-2400, siehe Eintrag vom 17.07.) eingebaut: Host verfuegt
+  jetzt ueber 32GB (vorher 16GB)
+- VM100-Speicherzuweisung bereits bei 20GB (siehe qm-Config, `-m 20480`)
+
+### KRITISCHER FUND: virtiofsd File-Handle-Erschoepfung (Ursache fuer wiederholte
+"Too many open files in system"-Ausfaelle seit 15./16.08.)
+
+**Symptom:** Nach praktisch jedem VM100-Neustart lief der Host-weite Handle-Vorrat
+von virtiofsd (Standardlimit ca. 1.000.000) innerhalb weniger Minuten voll, sobald
+alle ~30 Docker-Container gleichzeitig hochfuhren (restart: unless-stopped startet
+alle gleichzeitig, nicht gestuft). Betroffen waren praktisch alle Dienste auf
+/mnt/nas6tb gleichzeitig: Nextcloud ("Too many open files"-Fehler, .htaccess nicht
+lesbar), Paperless, Immich (Postgres-Crash-Loop), RomM/MariaDB (tc.log-Korruption
+durch abgebrochene Schreibvorgaenge waehrend der Handle-Erschoepfung), Kavita,
+Kopia u.a.
+
+**Fehldiagnosen unterwegs (zur Doku, falls das Muster nochmal auftritt):**
+- Docker-Version (29.6.2 vs. 29.7.2) hat KEINEN Einfluss - kontrolliert getestet
+  per Downgrade, Fehler trat identisch bei beiden Versionen auf
+- Kavitas Cover-Ordner (40.612 Einzeldateien) war ein REALER Mitverursacher,
+  aber NICHT die alleinige Ursache - nach Verschiebung von Kavitas config-Volume
+  auf lokalen VM100-Speicher (/opt/kavita-config statt /mnt/nas6tb/kavita/config)
+  trat das Problem weiterhin auf, ausgeloest durch die Summe aller anderen Dienste
+- cache=never fuer den virtiofs-Mount vermeidet zwar den Handle-Aufstau, bricht
+  aber SQLite-WAL-Datenbanken (TREK, vermutlich auch Kavita/GrampsWeb/
+  Audiobookshelf) mit SQLITE_IOERR_SHMMAP - NICHT verwenden
+- fatrace zur Taeterermittlung: in der VM nutzlos (fanotify funktioniert nicht
+  zuverlaessig auf virtiofs/FUSE-Mounts), auf dem Host zeigt es immer nur
+  virtiofsd selbst als Prozess (da virtiofsd als FUSE-Vermittler alle Zugriffe
+  stellvertretend ausfuehrt) - kein Weg, den tatsaechlichen Verursacher-Prozess
+  in der VM zu identifizieren
+
+**Bestaetigte Ursache:** virtiofsd referenziert Dateien standardmaessig
+(--inode-file-handles=never) ueber O_PATH-Filedescriptoren, die dauerhaft offen
+bleiben muessen. Proxmox aktiviert die Alternative (--inode-file-handles=prefer,
+nutzt stattdessen File-Handles) nur automatisch fuer Windows-Gaeste
+(PVE/QemuServer/Virtiofs.pm, siehe github.com/virtio-win/kvm-guest-drivers-windows/
+issues/1136). Bei Linux-Gaesten mit vielen Docker-Containern, die zusammen viele
+kleine Dateien anfassen (Kavita-Cover, Immich-Fotos, diverse Postgres/Redis-
+Datenbanken), lief der Handle-Vorrat deshalb bei praktisch jedem Neustart voll.
+Gefunden ueber: forum.proxmox.com/threads/185388 (Feature-Request-Thread) und
+bugzilla.proxmox.com/show_bug.cgi?id=7499
+
+**Baseline-Test zur Bestaetigung (17.08., vor dem Fix):**
+- Docker komplett deaktiviert (systemctl disable --now docker.socket
+  docker.service containerd) + VM-Neustart: Handle-Vorrat blieb stabil bei 27
+- Docker wieder aktiviert (alle 30 Container starten gleichzeitig durch
+  restart-Policy): Handle-Vorrat sprang sofort auf 59.000+ und stieg weiter
+- Damit zweifelsfrei bestaetigt: Docker/Container-Aktivitaet ist der Ausloeser,
+  kein reines virtiofs-Boot-Phaenomen
+
+**Fix (angewendet und verifiziert):**
+Auf dem Proxmox-Host in /usr/share/perl5/PVE/QemuServer/Virtiofs.pm die Zeile
+```
+my $prefer_inode_fh = PVE::QemuServer::Helpers::windows_version($conf->{ostype}) ? 1 : 0;
+```
+geaendert zu
+```
+my $prefer_inode_fh = 1; # forced on for Linux guests, siehe forum.proxmox.com/threads/185388
+```
+Backup der Originaldatei unter Virtiofs.pm.bak. Danach `systemctl restart pvedaemon`
+und VM-Neustart noetig, damit virtiofsd mit der neuen Option (sichtbar in
+`ps aux | grep virtiofsd`: `--inode-file-handles=prefer`) startet.
+
+**Verifikationstest nach dem Fix:** Alle 30 Docker-Container gleichzeitig
+gestartet (identisches Szenario wie beim Baseline-Test), Handle-Vorrat blieb ueber
+mehrere Minuten im niedrigen zwei- bis dreistelligen Bereich (44 -> 389 nach
+gut 3 Minuten), statt wie vorher auf mehrere hunderttausend zu steigen. Fix
+bestaetigt wirksam.
+
+**Bekannte Einschraenkung von --inode-file-handles=prefer:** Beeintraechtigt
+POSIX-ACL-Durchsetzung (open_by_handle_at umgeht bestimmte Pfad-basierte
+Zugriffspruefungen). Betrifft uns nicht, da auf dem Server keine POSIX-ACLs
+(setfacl/getfacl) im Einsatz sind, sondern ausschliesslich klassische Unix-
+Rechte (chown/PUID/PGID-basiert).
+
+**WICHTIG fuer die Zukunft:** Der Patch liegt in einer Datei, die zum
+qemu-server-Debian-Paket gehoert. Ein kuenftiges `apt upgrade` auf dem HOST
+(nicht VM100) kann die Datei ueberschreiben und den Fix zuruecksetzen. Nach
+jedem Proxmox-VE-Update pruefen:
+```bash
+grep prefer_inode_fh /usr/share/perl5/PVE/QemuServer/Virtiofs.pm
+```
+Sollte `my $prefer_inode_fh = 1;` zeigen. Falls nicht (durch Update
+zurueckgesetzt), Fix erneut anwenden wie oben beschrieben.
+
+### Weitere Fixes im Rahmen der Handle-Krise (17.08.)
+- Nextcloud: UID/GID-Fix (33:33 html/data, 999:999 redisdata) mehrfach angewendet,
+  jetzt automatisiert (siehe naechster Abschnitt)
+- RomM/MariaDB: tc.log-Korruption durch abgebrochene Schreibvorgaenge behoben
+  (Datei geloescht, MariaDB baut sie beim naechsten sauberen Start neu auf)
+- Kavita: durch Watchtower automatisch auf v0.9.0.2 aktualisiert worden, dabei
+  fehlgeschlagene DB-Migration (fehlende "Tagline"-Spalte in Series,
+  SeriesMetadata, AppUserRating) - manuell per ALTER TABLE nachgetragen, Downgrade
+  auf v0.8.6, Watchtower-Label entfernt (com.centurylinklabs.watchtower.enable=false)
+- Kavita-Config dauerhaft von /mnt/nas6tb/kavita/config nach /opt/kavita-config
+  (lokale VM100-Systemdisk) verschoben - WICHTIG: dieser Pfad liegt jetzt AUSSERHALB
+  des taeglichen Backup-Skripts (das nur /mnt/nas6tb/* sichert) - Backup-Skript-
+  Anpassung noch offen (siehe naechste Schritte)
+- Alter, verwaister Ordner /mnt/nas6tb/kavita/config.old-unused geloescht (nach
+  Bestaetigung, dass /opt/kavita-config alles enthaelt, diff -rq war leer)
+
+### Neu: Automatischer Nextcloud-Rechte-Fix nach VM-Neustart
+Da das UID/GID-Problem bei Nextcloud (100:101 statt 33:33/999:999) wiederholt
+nach harten VM100-Neustarts auftrat, jetzt automatisiert:
+- Skript: /root/fix-nextcloud-perms.sh (chown html/data auf 33:33, redisdata auf
+  999:999, danach docker restart nextcloud nextcloud-redis, 30s Anlaufzeit)
+- Cronjob (root): `@reboot /root/fix-nextcloud-perms.sh >> /var/log/nextcloud-perm-fix.log 2>&1`
+- Laeuft bei jedem Boot, unabhaengig davon ob das Problem diesmal auftritt
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Backup-Skript noch nicht um /opt/kavita-config ergaenzt (liegt jetzt ausserhalb
+  von /mnt/nas6tb, wird vom bestehenden Kopia-Snapshot-Schema nicht erfasst)
+- Analog fuer RomM ist noch kein automatischer tc.log-Check/Fix nach Neustart
+  eingerichtet (bisher nur manuell behoben, koennte nach dem virtiofsd-Fix aber
+  ohnehin seltener/nie mehr auftreten, da die urspruengliche Ursache - Handle-
+  Erschoepfung waehrend MariaDB-Schreibvorgang - behoben ist)
+- Separate virtiofs-Mounts pro Dienst (Nextcloud/Immich/Paperless einzeln) waren
+  als zusaetzliche Fehlerdomaenen-Isolierung diskutiert, sind nach dem
+  virtiofsd-Fix aber nicht mehr zwingend noetig - Ruecksprache bei Bedarf
+- QEMU Guest Agent weiterhin nicht in VM100 installiert (unveraendert seit 17.07.)
+- Home-Assistant-Live-Status-Widget in Homepage weiterhin 401 (unveraendert)
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Backup-Skript um /opt/kavita-config ergaenzen
+2. Restore-Test fuer Kavita-Config am neuen Pfad verifizieren
+3. Bei Gelegenheit: RomM-tc.log-Check ins Boot-Skript mit aufnehmen (niedrige
+   Prioritaet, da Ursache behoben)
+4. VM-Speicherzuweisungen nach RAM-Upgrade (16GB -> 32GB Host) ueberpruefen/
+   anpassen - VM100 laeuft bereits mit 20GB, VM101 pruefen
+
+### Zugriff / Referenzen (Ergaenzung)
+- Kavita-Config (neu): /opt/kavita-config (lokale VM100-Disk, NICHT mehr auf
+  nas6tb/virtiofs)
+- virtiofsd-Patch: /usr/share/perl5/PVE/QemuServer/Virtiofs.pm auf dem
+  Proxmox-Host (Backup: Virtiofs.pm.bak im selben Verzeichnis)
+- Nextcloud-Auto-Fix: /root/fix-nextcloud-perms.sh, Log unter
+  /var/log/nextcloud-perm-fix.log
