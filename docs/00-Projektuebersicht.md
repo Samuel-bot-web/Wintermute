@@ -1616,3 +1616,128 @@ nach harten VM100-Neustarts auftrat, jetzt automatisiert:
   Proxmox-Host (Backup: Virtiofs.pm.bak im selben Verzeichnis)
 - Nextcloud-Auto-Fix: /root/fix-nextcloud-perms.sh, Log unter
   /var/log/nextcloud-perm-fix.log
+
+## Aktueller Stand (18.08.2026 - Nachwehen der Handle-Krise behoben, Aufräumarbeiten, Seerr-Migration)
+
+### Vollstaendig abgeschlossen: Restarbeiten nach dem virtiofsd-Fix vom 17.08.
+- Kavita und RomM starteten nach VM-Neustart nicht automatisch mit: Ursache war
+  eine veraltete Restart-Policy im Docker-internen Zustand (Kavita hatte noch
+  `restart: no` aus der Debugging-Phase, RomM/romm-db hatten korrekte Policy in
+  der Compose-Datei, aber der laufende Container kannte noch den alten Stand).
+  Fix: `docker compose up -d --force-recreate` fuer beide Stacks, danach zeigt
+  `docker inspect <name> --format '{{.HostConfig.RestartPolicy}}'` korrekt
+  `{unless-stopped 0}`
+- RomM-DB: erneut tc.log-Korruption ("Bad magic header in tc log") durch den
+  --force-recreate-Vorgang ausgeloest - gleicher Fix wie am 17.08. (tc.log
+  loeschen, MariaDB baut sie beim naechsten sauberen Start neu auf). Da das
+  jetzt zweimal auftrat, langfristig ggf. automatisierten Check erwaegen
+  (niedrige Prioritaet, da urspruengliche Handle-Erschoepfungs-Ursache behoben)
+- Kavita auf v0.9.0.2 aktualisiert (kontrolliert, mit vorherigem DB-Backup
+  unter /opt/kavita-config/kavita.db.pre-latest-update-backup): Migration lief
+  diesmal sauber durch, da die am 16./17.08. manuell nachgetragenen
+  Tagline-Spalten (Series, SeriesMetadata, AppUserRating) bereits vorhanden
+  waren. Watchtower-Label wieder auf enable=true gesetzt.
+
+### HortusFox und Gramps Web vollstaendig entfernt (nie genutzt)
+- Container gestoppt und entfernt (hortusfox, hortusfox-db, grampsweb,
+  grampsweb-celery, grampsweb-redis)
+- Daten geloescht: /mnt/nas6tb/hortusfox, /mnt/nas6tb/grampsweb
+- Stack-Configs geloescht: stacks/hortusfox, stacks/grampsweb
+- Homepage-Dashboard-Eintraege entfernt
+- Backup-Skript bereinigt (drei Zeilen in /root/backup-nightly.sh entfernt:
+  hortusfox-db-Dump und beide Kopia-Snapshot-Befehle)
+- NPM Proxy Hosts und Cloudflare Published Routes geprueft/bereinigt
+- WICHTIGE LEHRE fuer kuenftige Dienst-Entfernungen: IMMER das Backup-Skript
+  mitpruefen (`grep -i <dienstname> /root/backup-nightly.sh`) - Dienste koennen
+  dort explizit gelistet sein, auch wenn man das nicht mehr erwartet
+
+### Jellyseerr zu Seerr migriert (Projekt-Rebrand)
+Jellyseerr und Overseerr wurden vom Upstream-Projekt zu einem gemeinsamen
+Nachfolgeprojekt "Seerr" zusammengefuehrt (seerr-team/seerr). Das alte
+fallenbagel/jellyseerr-Image (zuletzt v2.7.3) erhaelt keine Updates mehr.
+- Neues Image: ghcr.io/seerr-team/seerr:latest (v3.4.1 zum Zeitpunkt der
+  Migration) - WICHTIG: nicht "seerrteam/seerr" (falscher erster Versuch,
+  Image existiert nicht)
+- Migration ist automatisch: Seerr erkennt die bestehende Jellyseerr-Datenbank
+  beim ersten Start und migriert sie selbststaendig (u.a. neue Migrationen
+  0007_migrate_arr_tags.js, 0008_migrate_blacklist_to_blocklist.js liefen
+  sauber durch), keine manuellen Schritte an den Daten noetig
+- Compose-Aenderungen laut offizieller Migrationsanleitung: Container-Name
+  jellyseerr -> seerr, `init: true` neu erforderlich (Seerr liefert keinen
+  eigenen Init-Prozess mehr mit), kein `user:`-Directive mehr noetig (laeuft
+  fest als node-User UID 1000)
+- Config-Volume-Pfad bewusst beibehalten (weiterhin
+  /mnt/nas6tb/media-automation/jellyseerr/config), nur der Ordnername blieb
+  historisch "jellyseerr" - funktioniert einwandfrei, da nur der Pfad zaehlt
+- Vor der Migration: Ordner-Eigentuemer musste von 100:101 auf 1000:1000
+  umgestellt werden (chown -R 1000:1000), sonst kann der node-User im
+  Container nicht schreiben
+
+### WICHTIGE LEHRE: Gluetun-Neustart reisst alle abhaengigen Container offline
+Beim Hochfahren von Seerr wurde der gluetun-Container als Dependency neu
+erstellt (nicht nur neu gestartet). Alle anderen Container, die
+`network_mode: "service:gluetun"` nutzen (Radarr, Sonarr, Prowlarr, NZBGet),
+haengen an dem SPEZIFISCHEN Netzwerk-Namespace der jeweiligen Gluetun-Instanz.
+Nach einem Gluetun-Neuerstellen zeigen diese Container zwar "Up" in
+`docker ps`, sind aber tatsaechlich komplett offline (alter, toter
+Namespace) - und `docker restart` behebt das NICHT (Fehler: "joining network
+namespace of container: No such container: <alte-ID>").
+**Fix:** `docker compose up -d --force-recreate <alle betroffenen Services>`
+noetig, nicht nur restart.
+**Lehre fuer die Zukunft:** Bei jeder Aenderung an gluetun (Update,
+force-recreate, o.ae.) IMMER alle Container mit force-recreate nachziehen,
+die network_mode: "service:gluetun" nutzen: radarr, sonarr, prowlarr,
+nzbget, seerr.
+
+### VPN-Schutz nach allen Aenderungen re-verifiziert
+`docker exec nzbget wget -qO- ifconfig.me`, `docker exec gluetun ...` und
+`docker exec radarr ...` liefern uebereinstimmend die IVPN-IP (37.58.60.153,
+Frankfurt) - Tunnel funktioniert weiterhin korrekt nach dem Gluetun-Neustart-
+Zwischenfall.
+
+### TREK: Login schlug fehl nach Handle-Krise ("secretOrPrivateKey must have a value")
+Weiterer Kollateralschaden der Handle-Erschoepfung vom 17.08.: TREKs
+JWT-Secret-Datei (data/.jwt_secret) war durch einen abgebrochenen
+Schreibvorgang auf 0 Bytes zurueckgeblieben (Zeitstempel exakt in der
+Handle-Krise-Zeitspanne), zusaetzlich mit falscher UID/GID (100:101 statt
+1000:1000). TREK generiert diesen Secret normalerweise einmalig automatisch
+beim ersten Start.
+**Fix:** Container gestoppt, leere .jwt_secret-Datei geloescht
+(`rm /mnt/nas6tb/trek/data/.jwt_secret`), Container neu gestartet - TREK hat
+automatisch einen neuen, gueltigen Secret generiert und mit korrekter
+UID/GID (1000:1000) persistiert. Alle bestehenden Sessions wurden dadurch
+invalidiert (einmaliges Neu-Einloggen noetig), Trip-Daten selbst (travel.db)
+blieben unberuehrt, da Secret und Daten getrennt gespeichert sind.
+
+### Aufraeum-Scan nach 0-Byte-Dateien (praeventiv)
+Nach dem TREK-Fund wurde gezielt nach weiteren moeglichen Kollateralschaeden
+der Handle-Krise gesucht:
+```bash
+find /mnt/nas6tb -maxdepth 4 -type f -empty -newer /mnt/nas6tb/trek 2>/dev/null
+```
+Ergebnis: ueberwiegend harmlose, selbst-aufraeumende Artefakte (Redis
+temp-*.rdb-Dateien, Paperless __paperless_write_test_*-Dateien vom
+Beschreibbarkeits-Check beim Start, normale DB-Logdateien). Einzig
+nextcloud/pgdata/core.26 (vermutlich abgebrochener Postgres-Crash-Dump, 0
+Byte) war auffaellig, aber nextcloud-db-Logs zeigten keine Crash-/Signal-
+Meldungen - unbedenklich, geloescht. Alle gefundenen Dateien nach Pruefung
+entfernt, keine tatsaechlich noch aktiven Probleme gefunden.
+
+### Bekannte offene Probleme (bewusst zurueckgestellt)
+- Backup-Skript weiterhin nicht um /opt/kavita-config ergaenzt (unveraendert
+  seit 17.08.)
+- RomM tc.log-Problem ist jetzt zweimal aufgetreten (17.08. und 18.08.) -
+  automatisierter Check/Fix im Boot-Skript waere sinnvoll, niedrige
+  Prioritaet
+
+### Naechste Schritte (Ziel der kommenden Session)
+1. Backup-Skript um /opt/kavita-config ergaenzen (weiterhin offen)
+2. RomM-tc.log-Check ins Boot-Skript aufnehmen, analog zum
+   Nextcloud-Auto-Fix (/root/fix-nextcloud-perms.sh als Vorlage)
+3. Media-Automation-Stack: seerr statt jellyseerr in Doku-Referenzen
+   (20-Netzwerk.md, falls dort mit altem Namen vermerkt) aktualisieren
+
+### Zugriff / Referenzen (Ergaenzung)
+- Seerr (vormals Jellyseerr): lokal Port 5055 unveraendert, oeffentlich
+  weiterhin https://requests.brueggemann.site
+- Seerr-Image: ghcr.io/seerr-team/seerr:latest
