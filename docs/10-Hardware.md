@@ -65,3 +65,51 @@ Stand: 18.07.2026
 - Externe USB-Platte (sdd) ist nicht dauerhaft am Server - nur für
   Foto-Import-Vorgänge angeschlossen, taucht daher nicht immer in
   lsblk auf
+## RAM-Aufruestung abgeschlossen (17.08.2026)
+
+Physischer Einbau der bereits am 17.07. bestellten RAM-Module durchgefuehrt.
+Host verfuegt jetzt ueber **32GB RAM** (vorher 16GB).
+
+### Tatsaechliche Bestueckung (per `sudo lshw -short` / `inxi -Fxz` verifiziert)
+
+| Slot | Groesse | Typ |
+|------|---------|-----|
+| 0    | 8GiB    | DDR4 Synchronous 2400 MHz |
+| 1    | 16GiB   | DDR4 Synchronous 2400 MHz |
+| 2    | 8GiB    | DDR4 Synchronous 2400 MHz |
+| 3    | leer    | - |
+
+**Abweichung vom urspruenglichen Plan:** Der Eintrag vom 17.07. sah 4x8GB auf
+allen 4 Slots vor (2x vorhandene Crucial Ballistix + 2x neu bestellte BRAINZAP-
+Module). Tatsaechlich zeigt die Auslesung ein 16GB-Modul in Slot 1 und nur 3 von
+4 Slots belegt (Slot 3 leer). Gesamtkapazitaet (32GB) stimmt mit dem Ziel
+ueberein, die Modul-Aufteilung weicht aber ab - moeglicherweise wurde eines der
+neuen Module durch ein bereits vorhandenes 16GB-Modul ersetzt/ergaenzt statt wie
+geplant zusaetzlich 2x8GB zu verbauen. Nicht weiter kritisch (funktioniert, volle
+32GB erkannt), aber bei zukuenftiger Board-/RAM-Arbeit im Hinterkopf behalten -
+Slot 3 hat noch Platz fuer weitere Aufruestung, falls gewuenscht.
+
+### Speicherauslastung nach Upgrade (Stand 17.08., VM100 mit vollem Docker-Stack aktiv)
+- Gesamt: 32GB, davon 26,73GB genutzt (85,6%)
+- Grund: VM100 laeuft mit 20GB zugewiesenem RAM (`-m 20480` in der qm-Config),
+  VM101 zusaetzlich - der Host selbst hat davon unabhaengig wenig eigenen Bedarf
+- Swap: 12,06GB konfiguriert, davon nur 20KiB genutzt (0,0%) - deutliche
+  Verbesserung gegenueber vorher (3,1GB Swap-Nutzung bei 16GB RAM), Ziel der
+  Aufruestung damit erreicht
+- Perspektivisch pruefen, ob VM100/VM101-Speicherzuweisungen angesichts der
+  jetzt verfuegbaren 32GB noch weiter angepasst werden sollten (z.B. mehr RAM
+  fuer VM100 wegen des mittlerweile umfangreichen Docker-Stacks)
+
+### Werkzeuge fuer Hardware-Auslesung installiert
+`lshw`, `inxi`, `hwinfo` auf dem Host installiert (zuvor nicht vorhanden) -
+nuetzlich fuer kuenftige Hardware-Checks:
+```bash
+inxi -Fxz              # uebersichtliche Gesamtuebersicht (System, CPU, RAM, Storage, Netzwerk)
+sudo lshw -short        # kompakte Hardwareliste
+sudo hwinfo --short      # alternative Uebersicht
+```
+
+### CPU/System zur Referenz (unveraendert, per inxi bestaetigt)
+- Intel Core i7-7700 (Kaby Lake), 4 Kerne / 8 Threads, bis 4200 MHz
+- Board: Gigabyte Z170-HD3P-CF, BIOS F22g
+- Kernel: 7.0.14-5-pve (Proxmox VE)
