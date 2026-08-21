@@ -1741,3 +1741,30 @@ entfernt, keine tatsaechlich noch aktiven Probleme gefunden.
 - Seerr (vormals Jellyseerr): lokal Port 5055 unveraendert, oeffentlich
   weiterhin https://requests.brueggemann.site
 - Seerr-Image: ghcr.io/seerr-team/seerr:latest
+
+## Aktueller Stand (21.08.2026 - Paperless-Redis-Rechte-Problem, Boot-Skript erweitert)
+
+### Paperless: Upload/Verarbeitung schlug fehl (Redis MISCONF)
+Gleiches UID/GID-Muster wie bei Nextcloud/RomM/NZBGet: /mnt/nas6tb/paperless/redisdata
+gehoerte 100:101 statt der von Redis erwarteten 999:999. Symptom: Celery-Worker
+konnte sich nicht mit dem Redis-Broker verbinden ("MISCONF Redis is configured
+to save RDB snapshots, but it's currently unable to persist to disk"), wodurch
+die komplette asynchrone Dokumentenverarbeitung (inkl. Upload/OCR) blockiert war.
+Fix: chown -R 999:999 auf redisdata, docker restart paperless-broker, danach
+docker restart paperless. Nach dem Fix erfolgreich mit Test-Upload verifiziert
+(OCR lief durch, Dokument konsumiert).
+
+### Boot-Skript /root/fix-perms-on-boot.sh um Paperless-Redis erweitert
+Zusaetzlich zu Nextcloud, NZBGet-Downloads und RomM-tc.log jetzt auch:
+- Paperless-Redis: chown -R 999:999 auf redisdata, Neustart von paperless-broker
+  und paperless bei jedem VM-Boot
+
+**Lehre:** Das 100:101-Muster betrifft inzwischen bestaetigt vier verschiedene
+Dienste (Nextcloud, RomM, NZBGet, jetzt Paperless) - immer dort, wo Redis oder
+aehnliche Dienste mit spezifischer Nicht-Standard-UID (wie 999 bei Redis)
+laufen. Bei kuenftigen neuen Diensten mit eigenem Redis/aehnlichen Datenordnern
+von vornherein einen Boot-Fix-Eintrag mit einplanen.
+
+### Zugriff / Referenzen (Ergaenzung)
+- Boot-Rechte-Fix-Skript deckt jetzt ab: Nextcloud, Paperless-Redis,
+  NZBGet-Downloads, RomM-tc.log
