@@ -55,12 +55,45 @@ kein manueller Eingriff nötig.
 
 ### media-automation
 - Zweck: Automatisierte Mediensuche/-beschaffung über Usenet (Radarr,
-  Sonarr, Prowlarr, NZBGet), Anfrage-Portal für Freunde (Jellyseerr)
+  Sonarr, Prowlarr, NZBGet), Anfrage-Portal für Freunde (Seerr)
 - Konfiguration: stacks/media-automation/compose.yml, .env (WireGuard-
   Key, NZBGet-Login - nicht im Git-Repo)
 - Netzwerk-Besonderheit: alle Container außer gluetun selbst nutzen
   network_mode: "service:gluetun" - kein eigenes Docker-Netzwerk,
   Erreichbarkeit untereinander per "localhost"
 - Daten: Configs auf 6-TB-Platte (/mnt/nas6tb/media-automation/...),
-  Mediendateien direkt auf 4-TB-Platte (/mnt/media/Plex/...)
-- Watchtower: NICHT aktiviert (kein Backup-Konzept für diesen Stack)
+  Mediendateien direkt auf 4-TB-Platte (/mnt/media/...)
+- Auto-Update: über Dockhand, pro Container einzeln konfigurierbar
+  (siehe 80-Wartung.md)
+
+## Incident: Gluetun-Update reißt abhängige Container mit (22./23.08.2026)
+
+Watchtower hat nachts (04:00 lokal / 02:00 UTC) automatisch ein neues
+Gluetun-Image gezogen und den Container komplett neu erstellt (nicht nur
+neugestartet). Da Radarr, Sonarr, Prowlarr, NZBGet und Seerr per
+network_mode: "service:gluetun" Gluetuns Netzwerk-Namespace mitbenutzen,
+verloren sie beim Neubau ihre Netzwerkverbindung (ENETUNREACH). Erste
+Nacht: mehrere Container crashten direkt (Exit 128), zusätzlich verschärft
+durch eine fast volle Root-Partition (95%). Zweite Nacht: nur Seerr gab
+nach ~25 Min. dauerhafter Verbindungsfehler auf (Exit 143), die anderen
+liefen scheinbar weiter, aber ohne funktionierende Netzwerkverbindung.
+
+Ursache: Gluetuns Neuerstellung invalidiert den Netzwerk-Namespace, auf
+den die abhängigen Container beim Start verwiesen haben. Ein einfacher
+Neustart der abhängigen Container behebt es, passiert aber nicht
+automatisch.
+
+Lösung (siehe auch 80-Wartung.md):
+- Healthcheck bei nzbget/radarr/sonarr/prowlarr/seerr prüft jetzt
+  Gluetuns eigenen Health-Port (127.0.0.1:9999) statt nur sich selbst
+- depends_on: gluetun: condition: service_healthy
+- Zusätzlicher autoheal-Container (willfarrell/autoheal) startet
+  Container mit Label autoheal=true automatisch neu, sobald Docker sie
+  als unhealthy markiert (Docker selbst tut das nicht von sich aus)
+- Getestet per `docker restart gluetun`: abhängige Container erkannten
+  den Ausfall und erholten sich innerhalb ~1 Minute automatisch
+
+Lehre: Bei network_mode: "service:X"-Konstruktionen (Gluetun & Co.)
+gehört ein Healthcheck gegen die geteilte Netzwerkressource + Autoheal
+zur Grundausstattung, nicht nur ein Healthcheck gegen sich selbst -
+letzterer erkennt kaputte Netzwerk-Namespaces oft gar nicht.
