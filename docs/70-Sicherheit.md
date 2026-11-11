@@ -67,3 +67,68 @@ Platte ohne das Keyfile nicht mehr entschluesselbar. Empfehlung: Vor
 groesseren System-Eingriffen ein Backup des Keyfiles an einem sicheren,
 getrennten Ort aufbewahren (z.B. Passwort-Manager, verschluesselter
 USB-Stick), NICHT im Git-Repo, da dieses oeffentlich auf GitHub liegt.
+
+## Dropbear-Remote-Unlock: SSH-Zugang (11.11.2026)
+
+### Ausgangslage
+Nach einem Ausschalten des Servers war der Remote-Unlock nicht möglich:
+Der Laptop (Samuel-Laptop, Ubuntu) hatte keinen SSH-Schlüssel mehr in
+~/.ssh/, Dropbear akzeptiert aber nur Public-Key-Login. Unlock erfolgte
+deshalb einmalig lokal mit Monitor und Tastatur. Welcher Schlüssel
+vorher für Dropbear hinterlegt war, ist nicht dokumentiert.
+
+### Eckdaten Dropbear
+- Version: dropbear_2025.89 (im initramfs)
+- Erreichbar: 192.168.178.37, Port 22, Benutzer root
+- Authentifizierung: nur Public Key, kein Passwort
+- Schlüsseldatei auf dem Host: /etc/dropbear/initramfs/authorized_keys
+- Nach jeder Änderung daran: initramfs neu bauen (vorher prüfen, dass
+  /boot gemountet ist, sonst stiller Fehlschlag):
+  mount | grep /boot
+  sudo update-initramfs -u -k all
+- Meldung "No /etc/kernel/proxmox-boot-uuids found, skipping ESP sync"
+  ist normal (Boot über GRUB, nicht über proxmox-boot-tool)
+
+### Hinterlegter Schlüssel
+- Typ: ed25519
+- Fingerprint: SHA256:xH0TNldl//kYfYZXoeCcktdH+wu2PG6TYtLO424spXg
+- Kommentar: samuel@Samuel-Laptop
+- Ablage auf dem Laptop: ~/.ssh/wintermute (+ .pub)
+- Wird für Dropbear (root) UND den normalen Host-Login (samuel) genutzt
+- Private Key zusätzlich im Passwort-Manager gesichert
+
+### Zwei Host-Keys unter derselben IP
+Dropbear und OpenSSH (nach dem Unlock) haben unterschiedliche Host-Keys.
+Ohne Gegenmaßnahme meldet SSH nach jedem Wechsel "REMOTE HOST
+IDENTIFICATION HAS CHANGED". Lösung: getrennte Einträge mit
+HostKeyAlias in ~/.ssh/config auf dem Laptop.
+
+- Dropbear:  SHA256:wpwGVt/Cpd0QIyABKHWQbL3gBaH11+JIiUJ7DhADZbQ
+- OpenSSH:   SHA256:Pdfdf5goTq6VwhcBPVm70h6jGOA8IKIK4YeYUdzRbfE
+
+~/.ssh/config auf dem Laptop:
+
+    Host wintermute-unlock
+        HostName 192.168.178.37
+        User root
+        IdentityFile ~/.ssh/wintermute
+        HostKeyAlias wintermute-dropbear
+
+    Host wintermute
+        HostName 192.168.178.37
+        User samuel
+        IdentityFile ~/.ssh/wintermute
+        HostKeyAlias wintermute-proxmox
+
+### Ablauf nach Ausschalten / Neustart
+1. Server einschalten
+2. ssh wintermute-unlock
+3. cryptroot-unlock  (erst NACH erfolgreichem Login eingeben, nicht
+   zusammen mit Schritt 2 einfügen)
+4. System-Passphrase eingeben, Verbindung bricht danach ab (normal)
+5. 4-TB- und 6-TB-Platte werden per Keyfile automatisch entsperrt,
+   VM100/VM101 starten per onboot=1, Container per restart-Policy
+6. Kontrolle: https://192.168.178.37:8006 und http://192.168.178.36:3001
+
+Fallback: Monitor und Tastatur direkt am Server, Passphrase lokal
+eingeben.

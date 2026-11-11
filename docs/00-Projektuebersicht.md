@@ -1768,3 +1768,33 @@ von vornherein einen Boot-Fix-Eintrag mit einplanen.
 ### Zugriff / Referenzen (Ergaenzung)
 - Boot-Rechte-Fix-Skript deckt jetzt ab: Nextcloud, Paperless-Redis,
   NZBGet-Downloads, RomM-tc.log
+
+## Aktueller Stand (11.11.2026 - Dropbear-Zugang wiederhergestellt)
+
+### Problem
+Nach dem Ausschalten war kein Remote-Unlock möglich: Auf dem Laptop
+existierte kein SSH-Schlüssel mehr, Dropbear lehnte mit "Permission
+denied (publickey)" ab. Unlock einmalig lokal mit Monitor/Tastatur.
+
+### Lösung
+- Neuer ed25519-Schlüssel ~/.ssh/wintermute auf dem Laptop erzeugt
+- In /etc/dropbear/initramfs/authorized_keys eingetragen, initramfs
+  für alle Kernel neu gebaut
+- ~/.ssh/config mit HostKeyAlias-Einträgen angelegt (wintermute-unlock
+  für Dropbear, wintermute für den normalen Login), da Dropbear und
+  OpenSSH unterschiedliche Host-Keys unter derselben IP haben
+- Details und Neustart-Ablauf: siehe 70-Sicherheit.md
+
+### Lehre
+Den Dropbear-Schlüssel nie nur auf einem einzigen Gerät haben: Private
+Key im Passwort-Manager sichern und dokumentieren, welcher Schlüssel
+hinterlegt ist.
+
+### Offene Punkte
+- authorized_keys von Dropbear auf alte, unbekannte Schlüssel prüfen
+  und ggf. entfernen (danach erneut update-initramfs)
+- Remote-Unlock beim nächsten Neustart verifizieren
+
+### Zugriff / Referenzen (Ergänzung)
+- Unlock: ssh wintermute-unlock, danach cryptroot-unlock
+- SSH Proxmox-Host: ssh wintermute
